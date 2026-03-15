@@ -1,0 +1,218 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { Sparkles, ChevronRight, AlertCircle, Clock } from "lucide-react";
+import type { Fight, PredictionResult } from "@/types";
+import { ConfidenceRing } from "@/components/ui/ConfidenceRing";
+import { PredictionSkeleton } from "@/components/ui/Skeleton";
+import { Badge } from "@/components/ui/Badge";
+import { cn } from "@/lib/utils";
+import { formatShortDate } from "@/lib/utils";
+
+interface PredictionPanelProps {
+  fight: Fight;
+  cachedPrediction?: PredictionResult | null;
+}
+
+export function PredictionPanel({ fight, cachedPrediction }: PredictionPanelProps) {
+  const [prediction, setPrediction] = useState<PredictionResult | null>(cachedPrediction ?? null);
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const [requested, setRequested] = useState(!!cachedPrediction);
+
+  const requestPrediction = () => {
+    if (isPending || prediction) return;
+    setRequested(true);
+    setError(null);
+
+    startTransition(async () => {
+      try {
+        const res = await fetch(`/api/prediction/${fight.id}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fight }),
+        });
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || `Request failed: ${res.status}`);
+        }
+
+        const data: PredictionResult = await res.json();
+        setPrediction(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to generate prediction");
+        setRequested(false);
+      }
+    });
+  };
+
+  // Not yet requested
+  if (!requested && !prediction) {
+    return (
+      <div className="p-4 sm:p-5">
+        <button
+          onClick={requestPrediction}
+          className={cn(
+            "w-full flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl",
+            "bg-ufc-red/10 border border-ufc-red/20 text-ufc-red font-semibold text-sm",
+            "hover:bg-ufc-red/15 hover:border-ufc-red/35 transition-all duration-200",
+            "group"
+          )}
+        >
+          <Sparkles size={15} className="group-hover:scale-110 transition-transform" />
+          Generate AI Prediction
+          <ChevronRight size={14} className="opacity-60 group-hover:translate-x-0.5 transition-transform" />
+        </button>
+      </div>
+    );
+  }
+
+  // Loading
+  if (isPending) {
+    return (
+      <div className="p-4 sm:p-5">
+        <div className="flex items-center gap-2 text-white/40 text-xs mb-4">
+          <div className="w-3 h-3 border-2 border-ufc-red/40 border-t-ufc-red rounded-full animate-spin" />
+          <span>Analyzing fighter data and generating prediction…</span>
+        </div>
+        <PredictionSkeleton />
+      </div>
+    );
+  }
+
+  // Error
+  if (error) {
+    return (
+      <div className="p-4 sm:p-5">
+        <div className="flex items-start gap-3 p-3 bg-red-500/8 border border-red-500/20 rounded-lg">
+          <AlertCircle size={15} className="text-red-400 flex-shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-red-400 text-sm font-medium">Prediction failed</p>
+            <p className="text-red-400/60 text-xs mt-0.5">{error}</p>
+          </div>
+          <button
+            onClick={() => { setError(null); setRequested(false); }}
+            className="text-red-400/60 hover:text-red-400 text-xs underline flex-shrink-0"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Prediction available
+  if (!prediction) return null;
+
+  const isF1Winner = prediction.winner === fight.fighter1.name ||
+    fight.fighter1.name.toLowerCase().includes(prediction.winner.toLowerCase()) ||
+    prediction.winner.toLowerCase().includes(fight.fighter1.name.toLowerCase().split(" ").pop() || "");
+
+  return (
+    <div className="p-4 sm:p-5 space-y-4 animate-fade-in-up">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-5 h-5 bg-ufc-red/15 rounded flex items-center justify-center">
+            <Sparkles size={11} className="text-ufc-red" />
+          </div>
+          <span className="text-white/60 text-xs font-semibold uppercase tracking-wider">
+            AI Prediction
+          </span>
+        </div>
+        {prediction.generatedAt && (
+          <div className="flex items-center gap-1 text-white/25 text-[10px]">
+            <Clock size={9} />
+            <span>{formatShortDate(prediction.generatedAt)}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Winner + confidence */}
+      <div className="flex items-center gap-5 p-4 bg-black/30 rounded-xl border border-white/5">
+        <ConfidenceRing value={prediction.confidence} size={84} />
+        <div className="flex-1 min-w-0">
+          <p className="text-white/40 text-[10px] uppercase tracking-widest mb-1">Predicted Winner</p>
+          <p className="text-white font-black text-lg sm:text-xl leading-tight truncate">
+            {prediction.winner}
+          </p>
+          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+            <Badge variant="outline" size="sm">{prediction.method}</Badge>
+            {prediction.rounds && (
+              <Badge variant="gray" size="sm">Rd {prediction.rounds}</Badge>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Fighter breakdowns */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {[
+          { data: prediction.fighter1Breakdown, isWinner: isF1Winner },
+          { data: prediction.fighter2Breakdown, isWinner: !isF1Winner },
+        ].map(({ data, isWinner }) => (
+          <div
+            key={data.name}
+            className={cn(
+              "p-3 rounded-lg border space-y-2",
+              isWinner
+                ? "bg-ufc-red/5 border-ufc-red/15"
+                : "bg-white/3 border-white/6"
+            )}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-white/80 text-xs font-bold truncate">{data.name}</span>
+              {isWinner && (
+                <span className="text-ufc-red text-[9px] uppercase tracking-wider font-semibold flex-shrink-0">
+                  ✓ Pick
+                </span>
+              )}
+            </div>
+
+            {data.keyAdvantages.length > 0 && (
+              <div>
+                <p className="text-[9px] uppercase tracking-widest text-emerald-500/60 mb-1">Advantages</p>
+                <ul className="space-y-0.5">
+                  {data.keyAdvantages.map((adv, i) => (
+                    <li key={i} className="text-[11px] text-white/50 flex gap-1.5">
+                      <span className="text-emerald-500/60 flex-shrink-0">+</span>
+                      <span>{adv}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {data.keyWeaknesses.length > 0 && (
+              <div>
+                <p className="text-[9px] uppercase tracking-widest text-red-500/50 mb-1">Concerns</p>
+                <ul className="space-y-0.5">
+                  {data.keyWeaknesses.map((w, i) => (
+                    <li key={i} className="text-[11px] text-white/35 flex gap-1.5">
+                      <span className="text-red-500/50 flex-shrink-0">−</span>
+                      <span>{w}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Narrative */}
+      {prediction.narrative && (
+        <div className="p-3 bg-black/20 rounded-lg border border-white/5">
+          <p className="text-[9px] uppercase tracking-widest text-white/25 mb-2">Analysis</p>
+          <p className="text-white/55 text-xs leading-relaxed">{prediction.narrative}</p>
+        </div>
+      )}
+
+      {/* Disclaimer */}
+      <p className="text-white/20 text-[9px] text-center">
+        AI analysis for entertainment only. Not betting advice.
+      </p>
+    </div>
+  );
+}
