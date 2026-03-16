@@ -49,7 +49,7 @@ export function getFlagEmoji(countryCode?: string): string {
   if (!/^[A-Z]{2}$/.test(code)) return "🌐";
   // Regional indicator symbols: A = 0x1F1E6
   const offset = 0x1f1e6 - 65;
-  return [...code].map((c) => String.fromCodePoint(c.charCodeAt(0) + offset)).join("");
+  return Array.from(code).map((c) => String.fromCodePoint(c.charCodeAt(0) + offset)).join("");
 }
 
 export function getConfidenceColor(confidence: number): string {

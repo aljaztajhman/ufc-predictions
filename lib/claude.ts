@@ -125,7 +125,7 @@ export async function generatePrediction(fight: Fight): Promise<PredictionResult
     winner: parsed.winner,
     confidence: Math.min(95, Math.max(50, Number(parsed.confidence))),
     method: parsed.method,
-    rounds: parsed.rounds || null,
+    rounds: parsed.rounds || undefined,
     fighter1Breakdown: {
       name: parsed.fighter1Breakdown?.name || fight.fighter1.name,
       keyAdvantages: parsed.fighter1Breakdown?.keyAdvantages || [],
