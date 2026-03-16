@@ -22,7 +22,6 @@ async function fetchJSON(url: string): Promise<unknown> {
 
 // ─── Events ──────────────────────────────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function parseEvent(e: any): UFCEvent {
   const competition = e.competitions?.[0];
   const competitors = competition?.competitors || [];
@@ -113,7 +112,6 @@ export async function fetchEventWithFights(eventId: string): Promise<{ event: UF
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function parseFighter(c: any): Fighter {
   const athlete = c.athlete || c;
   const stats = c.statistics || c.stats || {};
