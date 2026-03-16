@@ -6,6 +6,9 @@ import { EventCardSkeleton } from "@/components/ui/Skeleton";
 import type { UFCEvent } from "@/types";
 import { Zap, Calendar } from "lucide-react";
 
+// Re-render this page at most every 30 minutes so event data stays fresh.
+export const revalidate = 1800;
+
 async function getEvents(): Promise<UFCEvent[]> {
   const cacheKey = "events:upcoming";
   const cached = await getCachedData<UFCEvent[]>(cacheKey);

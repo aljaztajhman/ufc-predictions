@@ -11,6 +11,9 @@ import { formatEventDate, getEventBadge } from "@/lib/utils";
 import type { PredictionResult, EventWithFights } from "@/types";
 import type { Metadata } from "next";
 
+// Re-render event pages every 30 minutes so fight card changes are picked up.
+export const revalidate = 1800;
+
 interface PageProps {
   params: { eventId: string };
 }
@@ -24,7 +27,7 @@ async function getEventData(eventId: string): Promise<EventWithFights | null> {
   if (!data) return null;
 
   const result: EventWithFights = { ...data.event, fights: data.fights };
-  await setCachedData(cacheKey, result, 3600);
+  await setCachedData(cacheKey, result, 1800);
   return result;
 }
 
