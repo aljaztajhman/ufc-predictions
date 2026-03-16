@@ -223,53 +223,101 @@ export async function fetchEventWithFights(
     console.error("ESPN summary error for", eventId, err);
   }
 
-  // ── Step 2: ESPN Core competitions API (full card for upcoming events) ──────
+  // ── Step 2: ESPN Core competitions API — full card with real athlete stats ──
+  // Strategy:
+  //   a) Fetch the list of competition $refs for this event.
+  //   b) Fetch each competition to get the two competitor IDs.
+  //   c) Collect all unique athlete IDs across all bouts.
+  //   d) Fetch bio + stats + record for every athlete in parallel.
+  //   e) Build Fight objects from the real ESPN data.
+  // This gives us real career stats (strikeLPM, strikeAccuracy, etc.) for
+  // every fighter instead of hardcoded or estimated values.
   if (fights.length <= 1) {
     try {
-      const coreData = (await fetchJSON(
-        `${ESPN_CORE}/events/${eventId}/competitions?limit=50`
+      const coreList = (await fetchJSON(
+        `${ESPN_CORE}/events/${eventId}/competitions?limit=50`,
+        3600
       )) as any;
 
-      const refs: string[] = (coreData.items || [])
-        .map((i: any) => i.$ref)
+      const compRefs: string[] = (coreList.items || [])
+        .map((i: any) => i.$ref as string)
         .filter(Boolean);
 
-      if (refs.length > 0) {
+      if (compRefs.length > 0) {
+        // Fetch all competition objects in parallel
         const compResults = await Promise.allSettled(
-          refs.slice(0, 20).map((ref) => fetchJSON(ref, 3600))
+          compRefs.slice(0, 20).map((ref) => fetchJSON(ref, 7200))
         );
 
-        const coreCompFights: Fight[] = compResults
+        const validComps = compResults
           .filter(
             (r): r is PromiseFulfilledResult<any> => r.status === "fulfilled"
           )
-          .map((r, idx) => {
-            const comp = r.value;
-            const competitors = comp.competitors || [];
-            if (competitors.length < 2) return null;
+          .map((r) => r.value as any)
+          .filter((comp) => (comp.competitors || []).length >= 2);
 
-            const f1 = parseFighterFromCore(competitors[0]);
-            const f2 = parseFighterFromCore(competitors[1]);
+        // Collect unique athlete IDs from all competitions.
+        // ESPN Core competition objects have:
+        //   competitors[].id — the athlete's ESPN ID (what we need)
+        //   competitors[].athlete.$ref — a URL link (name NOT embedded)
+        const athleteIds = new Set<string>();
+        for (const comp of validComps) {
+          for (const c of comp.competitors || []) {
+            const id = String(c.id || "").trim();
+            if (id && id !== "0") athleteIds.add(id);
+          }
+        }
+
+        // Fetch real bio + stats + record for every athlete in parallel
+        const athleteIdArray = Array.from(athleteIds);
+        const athleteResults = await Promise.allSettled(
+          athleteIdArray.map((id) => fetchAthleteWithStats(id))
+        );
+
+        const athleteMap: Record<string, Fighter> = {};
+        athleteIdArray.forEach((id, idx) => {
+          const r = athleteResults[idx];
+          if (r.status === "fulfilled" && r.value.name !== "Unknown") {
+            athleteMap[id] = r.value;
+          }
+        });
+
+        // Sort competitions: matchNumber 1 = main event, higher = earlier on card
+        const sortedComps = [...validComps].sort(
+          (a, b) => (a.matchNumber ?? 99) - (b.matchNumber ?? 99)
+        );
+
+        const coreFights: Fight[] = sortedComps
+          .map((comp, idx) => {
+            const [c1, c2] = comp.competitors as any[];
+            if (!c1 || !c2) return null;
+
+            const id1 = String(c1.id || "");
+            const id2 = String(c2.id || "");
+            const f1 = athleteMap[id1] ?? blankFighter(c1.athlete?.displayName || "TBD");
+            const f2 = athleteMap[id2] ?? blankFighter(c2.athlete?.displayName || "TBD");
+
+            // Determine card section from cardSegment.name
+            const seg: string = (comp.cardSegment?.name || "").toLowerCase();
+            let section: Fight["section"] = "main";
+            if (seg.includes("early") || seg === "prelims2") {
+              section = "early-prelim";
+            } else if (seg.includes("prelim")) {
+              section = "prelim";
+            } else if (!seg && idx >= 5) {
+              section = idx >= 10 ? "early-prelim" : "prelim";
+            }
 
             const wcText: string = comp.type?.text || comp.typeText || "";
-            const section: Fight["section"] =
-              idx === 0
-                ? "main"
-                : idx < 5
-                ? "main"
-                : idx < 10
-                ? "prelim"
-                : "early-prelim";
 
             return {
-              id: `${eventId}-core-${idx}`,
+              id: `${eventId}-core-${comp.matchNumber ?? idx}`,
               eventId,
-              order: idx,
+              order: comp.matchNumber ?? idx,
               section,
               weightClass: wcText || "Catchweight",
               isTitleFight:
-                wcText.toLowerCase().includes("title") ||
-                comp.title === true,
+                wcText.toLowerCase().includes("title") || comp.title === true,
               isMainEvent: idx === 0,
               fighter1: f1,
               fighter2: f2,
@@ -277,40 +325,30 @@ export async function fetchEventWithFights(
           })
           .filter((f): f is Fight => f !== null);
 
-        // ESPN Core competitor objects store athlete info as $ref links —
-        // the names won't be resolved until the ref is fetched separately.
-        // If fewer than half the fights have real names, the Core data is
-        // useless; skip it and fall through to the hardcoded card instead.
-        const resolvedFights = coreCompFights.filter(
-          (f) => f.fighter1.name !== "Unknown" || f.fighter2.name !== "Unknown"
-        );
+        // Accept the ESPN Core card if at least half the fighters are named
+        const namedCount = coreFights.filter(
+          (f) => f.fighter1.name !== "TBD" && f.fighter2.name !== "TBD"
+        ).length;
         const coreIsUsable =
-          coreCompFights.length > 0 &&
-          resolvedFights.length >= coreCompFights.length / 2;
+          coreFights.length > 0 &&
+          namedCount >= Math.ceil(coreFights.length / 2);
 
-        if (coreIsUsable && coreCompFights.length > fights.length) {
-          fights = coreCompFights;
+        if (coreIsUsable && coreFights.length > fights.length) {
+          fights = coreFights;
 
-          // Pull date from the first competition if event metadata is missing
-          const firstComp =
-            compResults.find(
-              (r): r is PromiseFulfilledResult<any> => r.status === "fulfilled"
-            )?.value;
-          const compDate: string =
-            firstComp?.date || firstComp?.startDate || "";
-
+          // Build event metadata if ESPN summary didn't provide it
           if (!event) {
+            const firstComp = sortedComps[0];
             event = {
               id: eventId,
               name: "UFC Event",
               shortName: "UFC Event",
-              date: compDate || new Date().toISOString(),
+              date: firstComp?.date || firstComp?.startDate || new Date().toISOString(),
               location: firstComp?.venue?.fullName || "TBD",
               venue: firstComp?.venue?.fullName || "TBD",
-              mainEvent:
-                resolvedFights[0]
-                  ? `${resolvedFights[0].fighter1.name} vs ${resolvedFights[0].fighter2.name}`
-                  : "TBD",
+              mainEvent: coreFights[0]
+                ? `${coreFights[0].fighter1.name} vs ${coreFights[0].fighter2.name}`
+                : "TBD",
               status: "upcoming",
             };
           }
@@ -332,7 +370,111 @@ export async function fetchEventWithFights(
   return { event: event!, fights: namedFights };
 }
 
-// ─── Fighter parsing ───────────────────────────────────────────────────────────
+// ─── ESPN Core athlete data fetcher ───────────────────────────────────────────
+// Fetches real career stats for a fighter by ESPN athlete ID.
+// Uses 3 ESPN Core endpoints in parallel:
+//   /athletes/{id}            → bio (name, height, reach, stance, nationality)
+//   /athletes/{id}/statistics → career stats (strikeLPM, strikeAccuracy, tdAvg, …)
+//   /athletes/{id}/records    → W-L-D record with win breakdown
+
+async function fetchAthleteWithStats(athleteId: string): Promise<Fighter> {
+  const base = `${ESPN_CORE}/athletes/${athleteId}`;
+
+  const [bioResult, statsResult, recordResult] = await Promise.allSettled([
+    fetchJSON(base, 7200),
+    fetchJSON(`${base}/statistics`, 7200),
+    fetchJSON(`${base}/records`, 7200),
+  ]);
+
+  const bio =
+    bioResult.status === "fulfilled" ? (bioResult.value as any) : {};
+  const statsData =
+    statsResult.status === "fulfilled" ? (statsResult.value as any) : {};
+  const recordData =
+    recordResult.status === "fulfilled" ? (recordResult.value as any) : {};
+
+  // ── Record ──────────────────────────────────────────────────────────────────
+  const recordSummary: string =
+    recordData?.items?.[0]?.summary || "0-0-0";
+  const recordStats: any[] = recordData?.items?.[0]?.stats || [];
+  const parsedRecord = parseRecord(recordSummary);
+
+  const getRecordStat = (name: string): number | undefined =>
+    recordStats.find((s: any) => s.name === name)?.value ?? undefined;
+
+  // ── Career stats ────────────────────────────────────────────────────────────
+  const statsCategories: any[] = statsData?.splits?.categories || [];
+  const careerStats: Record<string, number> = {};
+  for (const category of statsCategories) {
+    for (const stat of category.stats || []) {
+      if (stat.name && stat.value !== undefined && stat.value !== null) {
+        careerStats[stat.name] = Number(stat.value);
+      }
+    }
+  }
+
+  // ESPN Core may return accuracy as 0-1 decimal or 0-100 integer.
+  // Values > 1 are already percentages; ≤ 1 need to be multiplied by 100.
+  const normalizeAccuracy = (v: number | undefined): number | undefined => {
+    if (v === undefined || v === 0) return undefined;
+    return v <= 1 ? Math.round(v * 100) : Math.round(v);
+  };
+
+  // ── Height ──────────────────────────────────────────────────────────────────
+  let height: string | undefined;
+  if (bio.displayHeight) {
+    height = bio.displayHeight as string;
+  } else if (bio.height) {
+    height = formatHeight(Number(bio.height));
+  }
+
+  return {
+    id: athleteId,
+    name: bio.displayName || bio.fullName || "Unknown",
+    nickname: bio.nickname || undefined,
+    record: {
+      wins: parsedRecord.wins,
+      losses: parsedRecord.losses,
+      draws: parsedRecord.draws,
+      noContests: getRecordStat("noContests"),
+      winsByKO: getRecordStat("tkos"),
+      winsBySub: getRecordStat("submissions"),
+      winsByDec: Math.max(
+        0,
+        parsedRecord.wins -
+          (getRecordStat("tkos") ?? 0) -
+          (getRecordStat("submissions") ?? 0)
+      ),
+    },
+    nationality: bio.flag?.alt || bio.birthPlace?.country || undefined,
+    countryCode: bio.flag?.href
+      ? extractCountryCode(bio.flag.href)
+      : undefined,
+    height,
+    reach: bio.reach ? `${bio.reach}"` : undefined,
+    stance: bio.stance as Fighter["stance"] | undefined,
+    imageUrl: bio.headshot?.href || undefined,
+    // Real ESPN Core stats — only populated when ESPN has data for this fighter.
+    // We never estimate or make up values; missing stats show as undefined in the UI.
+    sigStrikesLandedPerMin:
+      careerStats.strikeLPM || undefined,
+    sigStrikeAccuracy:
+      normalizeAccuracy(careerStats.strikeAccuracy),
+    takedownAvgPer15Min:
+      careerStats.takedownAvg || undefined,
+    takedownAccuracy:
+      normalizeAccuracy(careerStats.takedownAccuracy),
+    submissionAvgPer15Min:
+      careerStats.submissionAvg || undefined,
+    // ESPN Core does not expose SApM, StrDef%, or TDDef%.
+    // Leave as undefined — the StatBar component skips bars with undefined values.
+    sigStrikesAbsorbedPerMin: undefined,
+    sigStrikeDefense: undefined,
+    takedownDefense: undefined,
+  };
+}
+
+// ─── Fighter parsing (ESPN site API) ──────────────────────────────────────────
 
 function parseFighter(c: any): Fighter {
   const athlete = c.athlete || c;
@@ -365,25 +507,6 @@ function parseFighter(c: any): Fighter {
       parseFloat(stats.takedownAccuracy || "0") || undefined,
     takedownDefense:
       parseFloat(stats.takedownDefense || "0") || undefined,
-  };
-}
-
-function parseFighterFromCore(c: any): Fighter {
-  // ESPN Core competitor objects differ slightly from site API
-  const name =
-    c.athlete?.displayName ||
-    c.displayName ||
-    c.athlete?.fullName ||
-    "Unknown";
-  const recordStr = c.record || c.athlete?.record || "0-0-0";
-
-  return {
-    id: String(c.id || c.athlete?.id || Math.random()),
-    name,
-    record: parseRecord(recordStr),
-    nationality: c.athlete?.birthPlace?.country,
-    stance: c.athlete?.stance,
-    imageUrl: c.athlete?.headshot?.href,
   };
 }
 
