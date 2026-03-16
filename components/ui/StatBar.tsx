@@ -40,7 +40,7 @@ export function StatBar({
 
   if (value1 === undefined || value2 === undefined) return null;
 
-  const computedMax = max ?? Math.max(value1, value2) * 1.3 || 10;
+  const computedMax = (max ?? Math.max(value1, value2) * 1.3) || 10;
   const pct1 = Math.min(100, (value1 / computedMax) * 100);
   const pct2 = Math.min(100, (value2 / computedMax) * 100);
 
