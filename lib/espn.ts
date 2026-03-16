@@ -21,6 +21,24 @@ async function fetchJSON(url: string, revalidate = 3600): Promise<unknown> {
   return res.json();
 }
 
+// ─── Safe string extractor ─────────────────────────────────────────────────────
+// ESPN Core often returns fields as {id, text} objects rather than plain strings.
+// This helper safely unwraps those, preventing React from crashing when an object
+// is accidentally passed as a JSX child.
+function toStr(v: unknown): string {
+  if (v === null || v === undefined) return "";
+  if (typeof v === "string") return v;
+  if (typeof v === "number") return String(v);
+  if (typeof v === "object") {
+    const obj = v as Record<string, unknown>;
+    if (typeof obj.text === "string") return obj.text;
+    if (typeof obj.displayName === "string") return obj.displayName;
+    if (typeof obj.name === "string") return obj.name;
+    if (typeof obj.description === "string") return obj.description;
+  }
+  return "";
+}
+
 // ─── Event parsing ─────────────────────────────────────────────────────────────
 
 function parseEvent(e: any): UFCEvent {
@@ -298,7 +316,8 @@ export async function fetchEventWithFights(
             const f2 = athleteMap[id2] ?? blankFighter(c2.athlete?.displayName || "TBD");
 
             // Determine card section from cardSegment.name
-            const seg: string = (comp.cardSegment?.name || "").toLowerCase();
+            // Use toStr() because cardSegment may be an {id, text, name} object
+            const seg: string = toStr(comp.cardSegment?.name || comp.cardSegment).toLowerCase();
             let section: Fight["section"] = "main";
             if (seg.includes("early") || seg === "prelims2") {
               section = "early-prelim";
@@ -308,7 +327,8 @@ export async function fetchEventWithFights(
               section = idx >= 10 ? "early-prelim" : "prelim";
             }
 
-            const wcText: string = comp.type?.text || comp.typeText || "";
+            // comp.type is typically {id, text} — extract just the text
+            const wcText: string = toStr(comp.type?.text) || toStr(comp.type) || toStr(comp.typeText) || "";
 
             return {
               id: `${eventId}-core-${comp.matchNumber ?? idx}`,
@@ -420,18 +440,33 @@ async function fetchAthleteWithStats(athleteId: string): Promise<Fighter> {
     return v <= 1 ? Math.round(v * 100) : Math.round(v);
   };
 
-  // ── Height ──────────────────────────────────────────────────────────────────
+  // ── Height & Reach ───────────────────────────────────────────────────────────
+  // Use toStr() since ESPN Core may return these as objects too.
   let height: string | undefined;
-  if (bio.displayHeight) {
-    height = bio.displayHeight as string;
-  } else if (bio.height) {
-    height = formatHeight(Number(bio.height));
+  const rawDisplayHeight = toStr(bio.displayHeight);
+  const rawHeight = toStr(bio.height);
+  if (rawDisplayHeight) {
+    height = rawDisplayHeight;
+  } else if (rawHeight) {
+    const inches = Number(rawHeight);
+    height = isNaN(inches) ? rawHeight : formatHeight(inches);
   }
+
+  const rawReach = toStr(bio.reach);
+  const reach = rawReach ? (rawReach.includes('"') ? rawReach : `${rawReach}"`) : undefined;
+
+  // Use toStr() on every field that could come back as an ESPN {id, text} object.
+  // If any of these reach React as non-strings, we get Minified Error #31.
+  const name = toStr(bio.displayName) || toStr(bio.fullName) || "Unknown";
+  const nationality = toStr(bio.flag?.alt) || toStr(bio.birthPlace?.country) || undefined;
+  const stance = (toStr(bio.stance) || undefined) as Fighter["stance"] | undefined;
+  const flagHref = toStr(bio.flag?.href) || toStr(bio.flag?.$ref) || "";
+  const imageUrl = toStr(bio.headshot?.href) || undefined;
 
   return {
     id: athleteId,
-    name: bio.displayName || bio.fullName || "Unknown",
-    nickname: bio.nickname || undefined,
+    name,
+    nickname: toStr(bio.nickname) || undefined,
     record: {
       wins: parsedRecord.wins,
       losses: parsedRecord.losses,
@@ -446,14 +481,12 @@ async function fetchAthleteWithStats(athleteId: string): Promise<Fighter> {
           (getRecordStat("submissions") ?? 0)
       ),
     },
-    nationality: bio.flag?.alt || bio.birthPlace?.country || undefined,
-    countryCode: bio.flag?.href
-      ? extractCountryCode(bio.flag.href)
-      : undefined,
+    nationality,
+    countryCode: flagHref ? extractCountryCode(flagHref) : undefined,
     height,
-    reach: bio.reach ? `${bio.reach}"` : undefined,
-    stance: bio.stance as Fighter["stance"] | undefined,
-    imageUrl: bio.headshot?.href || undefined,
+    reach,
+    stance,
+    imageUrl,
     // Real ESPN Core stats — only populated when ESPN has data for this fighter.
     // We never estimate or make up values; missing stats show as undefined in the UI.
     sigStrikesLandedPerMin:
