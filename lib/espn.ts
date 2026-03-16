@@ -45,22 +45,27 @@ function parseEvent(e: any): UFCEvent {
 
 export async function fetchUpcomingEvents(): Promise<UFCEvent[]> {
   try {
-    // Get events for the next 6 months
-    const now = new Date();
-    const future = new Date();
-    future.setMonth(future.getMonth() + 6);
-    const dates = `${now.toISOString().split("T")[0]}%2C${future.toISOString().split("T")[0]}`;
-
-    const data = await fetchJSON(
-      `${ESPN_BASE}/scoreboard?limit=50&dates=${dates}`
-    ) as any;
+    // ESPN scoreboard without date filter returns current/upcoming events
+    const data = await fetchJSON(`${ESPN_BASE}/scoreboard?limit=30`) as any;
 
     const events: UFCEvent[] = (data.events || [])
       .map(parseEvent)
       .filter((e: UFCEvent) => e.status !== "completed")
       .sort((a: UFCEvent, b: UFCEvent) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    return events;
+    // If we got results, return them; otherwise try the league schedule endpoint
+    if (events.length > 0) return events;
+
+    const scheduleData = await fetchJSON(
+      `${ESPN_CORE}/events?limit=20&dates=${new Date().getFullYear()}`
+    ) as any;
+
+    const scheduleEvents: UFCEvent[] = (scheduleData.items || [])
+      .filter((e: any) => e.date && new Date(e.date) >= new Date())
+      .map((e: any) => parseEvent({ ...e, id: e.$ref?.split("/").pop() || e.id }))
+      .slice(0, 12);
+
+    return scheduleEvents.length > 0 ? scheduleEvents : getMockEvents();
   } catch (err) {
     console.error("fetchUpcomingEvents error:", err);
     return getMockEvents();

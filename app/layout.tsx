@@ -1,10 +1,14 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/ui/Navbar";
 import { cn } from "@/lib/utils";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+
+export const viewport: Viewport = {
+  themeColor: "#0A0A0A",
+};
 
 export const metadata: Metadata = {
   title: {
@@ -19,7 +23,6 @@ export const metadata: Metadata = {
     title: "UFC Predictions",
     description: "AI-powered UFC fight predictions",
   },
-  themeColor: "#0A0A0A",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
