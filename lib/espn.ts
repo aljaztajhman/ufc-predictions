@@ -8,6 +8,7 @@
  */
 
 import type { UFCEvent, Fight, Fighter, FighterRecord } from "@/types";
+import { enrichFighterWithUFCStats } from "./ufcstats";
 
 const ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports/mma/ufc";
 const ESPN_CORE = "https://sports.core.api.espn.com/v2/sports/mma/leagues/ufc";
@@ -329,7 +330,29 @@ export async function fetchEventWithFights(
     return getHardcodedEventFallback(eventId, event);
   }
 
-  return { event: event!, fights: namedFights };
+  // ── Step 4: Enrich fighters with live UFCStats data ────────────────────────
+  // Only enrich fighters that are missing striking/grappling stats — those
+  // already populated from hardcoded data don't need another fetch.
+  // Runs in parallel; Next.js caches each fetch call for 1 h so subsequent
+  // page loads skip UFCStats entirely.
+  const enrichedFights = await Promise.all(
+    namedFights.map(async (fight) => {
+      const needsEnrich = (f: Fighter) =>
+        f.sigStrikesLandedPerMin == null && f.takedownAvgPer15Min == null;
+
+      const [f1, f2] = await Promise.all([
+        needsEnrich(fight.fighter1)
+          ? enrichFighterWithUFCStats(fight.fighter1)
+          : Promise.resolve(fight.fighter1),
+        needsEnrich(fight.fighter2)
+          ? enrichFighterWithUFCStats(fight.fighter2)
+          : Promise.resolve(fight.fighter2),
+      ]);
+      return { ...fight, fighter1: f1, fighter2: f2 };
+    })
+  );
+
+  return { event: event!, fights: enrichedFights };
 }
 
 // ─── Fighter parsing ───────────────────────────────────────────────────────────
