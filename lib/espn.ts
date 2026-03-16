@@ -65,6 +65,22 @@ function parseEvent(e: any): UFCEvent {
   };
 }
 
+// ─── Enrich events with hardcoded data when ESPN is incomplete ────────────────
+
+function enrichEventFromHardcoded(event: UFCEvent): UFCEvent {
+  const hc = HARDCODED_EVENTS.find((h) => h.espnId === event.id);
+  if (!hc) return event;
+  return {
+    ...event,
+    name: hc.name,
+    shortName: hc.shortName,
+    mainEvent: hc.mainEvent,
+    // Only override location/venue if ESPN returned "TBD"
+    location: event.location === "TBD" ? hc.location : event.location,
+    venue: event.venue === "TBD" ? hc.venue : event.venue,
+  };
+}
+
 // ─── Upcoming events ───────────────────────────────────────────────────────────
 
 export async function fetchUpcomingEvents(): Promise<UFCEvent[]> {
@@ -80,6 +96,7 @@ export async function fetchUpcomingEvents(): Promise<UFCEvent[]> {
 
     const events: UFCEvent[] = (data.events || [])
       .map(parseEvent)
+      .map(enrichEventFromHardcoded)
       .filter((e: UFCEvent) => {
         if (e.status === "completed") return false;
         if (!e.date) return false;
@@ -115,7 +132,7 @@ export async function fetchUpcomingEvents(): Promise<UFCEvent[]> {
         .filter(
           (r): r is PromiseFulfilledResult<any> => r.status === "fulfilled"
         )
-        .map((r) => parseEvent(r.value))
+        .map((r) => enrichEventFromHardcoded(parseEvent(r.value)))
         .filter((e: UFCEvent) => {
           if (e.status === "completed") return false;
           if (!e.date) return false;
@@ -260,20 +277,39 @@ export async function fetchEventWithFights(
           })
           .filter((f): f is Fight => f !== null);
 
-        if (coreCompFights.length > fights.length) {
+        // ESPN Core competitor objects store athlete info as $ref links —
+        // the names won't be resolved until the ref is fetched separately.
+        // If fewer than half the fights have real names, the Core data is
+        // useless; skip it and fall through to the hardcoded card instead.
+        const resolvedFights = coreCompFights.filter(
+          (f) => f.fighter1.name !== "Unknown" || f.fighter2.name !== "Unknown"
+        );
+        const coreIsUsable =
+          coreCompFights.length > 0 &&
+          resolvedFights.length >= coreCompFights.length / 2;
+
+        if (coreIsUsable && coreCompFights.length > fights.length) {
           fights = coreCompFights;
-          // If event was null/partial, try to build from first competition
+
+          // Pull date from the first competition if event metadata is missing
+          const firstComp =
+            compResults.find(
+              (r): r is PromiseFulfilledResult<any> => r.status === "fulfilled"
+            )?.value;
+          const compDate: string =
+            firstComp?.date || firstComp?.startDate || "";
+
           if (!event) {
             event = {
               id: eventId,
               name: "UFC Event",
               shortName: "UFC Event",
-              date: new Date().toISOString(),
-              location: "TBD",
-              venue: "TBD",
+              date: compDate || new Date().toISOString(),
+              location: firstComp?.venue?.fullName || "TBD",
+              venue: firstComp?.venue?.fullName || "TBD",
               mainEvent:
-                coreCompFights[0]
-                  ? `${coreCompFights[0].fighter1.name} vs ${coreCompFights[0].fighter2.name}`
+                resolvedFights[0]
+                  ? `${resolvedFights[0].fighter1.name} vs ${resolvedFights[0].fighter2.name}`
                   : "TBD",
               status: "upcoming",
             };
@@ -285,12 +321,15 @@ export async function fetchEventWithFights(
     }
   }
 
-  // ── Step 3: If we have an event but no fights, use hardcoded card ───────────
-  if (fights.length === 0) {
+  // ── Step 3: Use hardcoded if we have no fights, or all fighters are unknown ──
+  const namedFights = fights.filter(
+    (f) => f.fighter1.name !== "Unknown" || f.fighter2.name !== "Unknown"
+  );
+  if (namedFights.length === 0) {
     return getHardcodedEventFallback(eventId, event);
   }
 
-  return { event: event!, fights };
+  return { event: event!, fights: namedFights };
 }
 
 // ─── Fighter parsing ───────────────────────────────────────────────────────────
