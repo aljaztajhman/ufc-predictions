@@ -1,7 +1,7 @@
 /**
- * Cache layer with Vercel KV as primary and in-memory fallback.
- * Vercel KV is used when KV_REST_API_URL + KV_REST_API_TOKEN are set.
- * Falls back to a module-level Map for local dev / when KV is not configured.
+ * Cache layer — Upstash Redis as primary, in-memory Map as fallback.
+ * Uses @upstash/redis with UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN env vars.
+ * Falls back to a module-level Map for local dev when Redis is not configured.
  */
 
 import type { PredictionResult } from "@/types";
@@ -23,59 +23,71 @@ function memSet(key: string, value: unknown, ttlSeconds: number): void {
   memCache.set(key, { value, expires: Date.now() + ttlSeconds * 1000 });
 }
 
-// ─── KV helpers ──────────────────────────────────────────────────────────────
-function isKVConfigured(): boolean {
-  return !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
+// ─── Upstash Redis helpers ────────────────────────────────────────────────────
+function isRedisConfigured(): boolean {
+  return !!(
+    process.env.UPSTASH_REDIS_REST_URL &&
+    process.env.UPSTASH_REDIS_REST_TOKEN
+  );
 }
 
-async function kvGet<T>(key: string): Promise<T | null> {
-  if (!isKVConfigured()) return null;
+async function redisGet<T>(key: string): Promise<T | null> {
+  if (!isRedisConfigured()) return null;
   try {
-    const { kv } = await import("@vercel/kv");
-    return await kv.get<T>(key);
+    const { Redis } = await import("@upstash/redis");
+    const redis = new Redis({
+      url: process.env.UPSTASH_REDIS_REST_URL!,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+    });
+    return await redis.get<T>(key);
   } catch {
     return null;
   }
 }
 
-async function kvSet(key: string, value: unknown, ttlSeconds: number): Promise<void> {
-  if (!isKVConfigured()) return;
+async function redisSet(key: string, value: unknown, ttlSeconds: number): Promise<void> {
+  if (!isRedisConfigured()) return;
   try {
-    const { kv } = await import("@vercel/kv");
-    await kv.set(key, value, { ex: ttlSeconds });
+    const { Redis } = await import("@upstash/redis");
+    const redis = new Redis({
+      url: process.env.UPSTASH_REDIS_REST_URL!,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+    });
+    await redis.set(key, value, { ex: ttlSeconds });
   } catch {
-    // silently fall through
+    // silently fall through to mem cache
   }
 }
 
-// ─── Public API ───────────────────────────────────────────────────────────────
-const PREDICTION_TTL = 60 * 60 * 24 * 30; // 30 days — predictions are permanent per fight
-const EVENTS_TTL = 60 * 60 * 6; // 6 hours for event listings
+// ─── TTLs ─────────────────────────────────────────────────────────────────────
+const PREDICTION_TTL = 60 * 60 * 24 * 30; // 30 days — permanent per fight
+const EVENTS_TTL = 60 * 60 * 6;            // 6 hours for event listings
 
+// ─── Public API ───────────────────────────────────────────────────────────────
 export async function getCachedPrediction(fightId: string): Promise<PredictionResult | null> {
   const key = `prediction:${fightId}`;
-  const kv = await kvGet<PredictionResult>(key);
-  if (kv) return kv;
+  const redis = await redisGet<PredictionResult>(key);
+  if (redis) return redis;
   return memGet<PredictionResult>(key);
 }
 
 export async function setCachedPrediction(fightId: string, prediction: PredictionResult): Promise<void> {
   const key = `prediction:${fightId}`;
-  await kvSet(key, prediction, PREDICTION_TTL);
+  await redisSet(key, prediction, PREDICTION_TTL);
   memSet(key, prediction, PREDICTION_TTL);
 }
 
 export async function getCachedData<T>(key: string): Promise<T | null> {
-  const kv = await kvGet<T>(key);
-  if (kv) return kv;
+  const redis = await redisGet<T>(key);
+  if (redis) return redis;
   return memGet<T>(key);
 }
 
 export async function setCachedData<T>(key: string, value: T, ttl = EVENTS_TTL): Promise<void> {
-  await kvSet(key, value, ttl);
+  await redisSet(key, value, ttl);
   memSet(key, value, ttl);
 }
 
 export function isCacheWarmed(): boolean {
-  return isKVConfigured();
+  return isRedisConfigured();
 }
