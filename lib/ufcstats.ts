@@ -132,13 +132,13 @@ function parseRecentFights(html: string): RecentFight[] {
         const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/g) || [];
         if (cells.length < 7) continue;
 
-        const getText = (cell: string) =>
-          cell.replace(/<[^>]+>/g, "").trim().replace(/\s+/g, " ");
+        const getText = (cell: string | undefined) =>
+          (cell ?? "").replace(/<[^>]+>/g, "").trim().replace(/\s+/g, " ");
 
         const result = getText(cells[0]).charAt(0) as RecentFight["result"];
         const opponent = getText(cells[1]);
-        const method = getText(cells[7] || cells[6] || "");
-        const event = getText(cells[6] || cells[5] || "");
+        const method = getText(cells[7] ?? cells[6] ?? "");
+        const event = getText(cells[6] ?? cells[5] ?? "");
         const date = getText(cells[cells.length - 1]);
 
         if (opponent && ["W", "L", "D", "N"].includes(result)) {
