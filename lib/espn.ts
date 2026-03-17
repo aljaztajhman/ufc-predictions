@@ -11,6 +11,9 @@ import type { UFCEvent, Fight, Fighter, FighterRecord } from "@/types";
 
 const ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports/mma/ufc";
 const ESPN_CORE = "https://sports.core.api.espn.com/v2/sports/mma/leagues/ufc";
+// Athlete endpoints live at the sport level, NOT under /leagues/ufc/.
+// e.g. /v2/sports/mma/athletes/{id}/statistics — NOT /leagues/ufc/athletes/{id}/statistics
+const ESPN_MMA = "https://sports.core.api.espn.com/v2/sports/mma";
 
 async function fetchJSON(url: string, revalidate = 3600): Promise<unknown> {
   const res = await fetch(url, {
@@ -398,7 +401,7 @@ export async function fetchEventWithFights(
 //   /athletes/{id}/records    → W-L-D record with win breakdown
 
 async function fetchAthleteWithStats(athleteId: string): Promise<Fighter> {
-  const base = `${ESPN_CORE}/athletes/${athleteId}`;
+  const base = `${ESPN_MMA}/athletes/${athleteId}`;
 
   const [bioResult, statsResult, recordResult] = await Promise.allSettled([
     fetchJSON(base, 7200),
