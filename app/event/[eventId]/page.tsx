@@ -62,69 +62,72 @@ async function EventContent({ eventId }: { eventId: string }) {
   return (
     <>
       {/* Event hero */}
-      <div className="relative overflow-hidden bg-gradient-to-b from-[#120000] to-transparent">
-        <div className="absolute inset-0 bg-gradient-to-br from-ufc-red/6 via-transparent to-transparent pointer-events-none" />
-        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-ufc-red/40 to-transparent" />
+      <div className="relative overflow-hidden">
+        {/* Ambient glow */}
+        <div className="absolute inset-0 bg-gradient-to-b from-[#1A0808]/60 via-[#0D0F18]/40 to-transparent pointer-events-none" />
+        <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-ufc-red/50 to-transparent" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-48 bg-ufc-red/6 blur-3xl rounded-full pointer-events-none" />
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 relative">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-6 sm:pt-10 sm:pb-8 relative">
           {/* Back link */}
           <Link
             href="/"
-            className="inline-flex items-center gap-2 text-white/40 hover:text-white text-sm mb-6 transition-colors group"
+            className="inline-flex items-center gap-2 text-white/35 hover:text-white/80 text-sm mb-8 transition-colors group"
           >
-            <ArrowLeft size={14} className="group-hover:-translate-x-0.5 transition-transform" />
+            <ArrowLeft size={13} className="group-hover:-translate-x-0.5 transition-transform" />
             All Events
           </Link>
 
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 flex-wrap">
-                {timeBadge && <EventTimeBadge label={timeBadge} />}
-                <Badge variant="gray" size="sm">
-                  <Shield size={9} />
-                  {fights.length} Fights
-                </Badge>
-              </div>
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black uppercase tracking-tight text-white">
-                {data.name}
-              </h1>
-              <div className="flex flex-wrap gap-4 text-white/40 text-sm">
-                <span className="flex items-center gap-1.5">
-                  <Calendar size={13} />
-                  {formatEventDate(data.date)}
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <MapPin size={13} />
-                  {data.location}
-                </span>
-              </div>
+          {/* Event meta */}
+          <div className="space-y-3 mb-8">
+            <div className="flex items-center gap-2 flex-wrap">
+              {timeBadge && <EventTimeBadge label={timeBadge} />}
+              <span className="text-[10px] font-semibold uppercase tracking-widest px-2.5 py-1 rounded-full border border-white/10 text-white/35 bg-white/4">
+                <Shield size={9} className="inline-block mr-1 align-middle" />
+                {fights.length} Fights
+              </span>
+            </div>
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black uppercase tracking-tight text-white leading-tight">
+              {data.name}
+            </h1>
+            <div className="flex flex-wrap gap-4 text-white/35 text-sm">
+              <span className="flex items-center gap-1.5">
+                <Calendar size={12} />
+                {formatEventDate(data.date)}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <MapPin size={12} />
+                {data.location}
+              </span>
             </div>
           </div>
 
-          {/* Main event matchup hero */}
+          {/* Main event matchup hero card */}
           {mainCard[0] && (
-            <div className="mt-8 p-5 bg-black/30 border border-white/6 rounded-xl backdrop-blur-sm">
-              <p className="text-white/30 text-[10px] uppercase tracking-widest mb-3">
+            <div className="relative rounded-2xl overflow-hidden border border-ufc-red/20 bg-gradient-to-br from-[#1E0808]/80 via-[#141520]/80 to-[#0D0F18]/80 backdrop-blur-sm p-5 sm:p-6">
+              <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-ufc-red/50 to-transparent" />
+              <p className="text-white/30 text-[9px] uppercase tracking-widest mb-4 font-semibold">
                 {mainCard[0].isTitleFight ? "🏆 Championship Bout" : "Main Event"}
                 {" · "}{mainCard[0].weightClass}
               </p>
               <div className="flex items-center justify-between gap-4">
                 <div className="flex-1 min-w-0">
-                  <p className="text-white font-black text-xl sm:text-2xl lg:text-3xl truncate">
+                  <p className="text-white font-black text-2xl sm:text-3xl lg:text-4xl truncate leading-tight">
                     {mainCard[0].fighter1.name}
                   </p>
-                  <p className="text-white/40 text-sm font-mono">
+                  <p className="text-white/35 text-sm font-mono mt-1">
                     {mainCard[0].fighter1.record.wins}-{mainCard[0].fighter1.record.losses}-{mainCard[0].fighter1.record.draws}
                   </p>
                 </div>
-                <div className="flex-shrink-0 px-3 py-1.5 bg-ufc-red/10 border border-ufc-red/20 rounded-lg">
-                  <span className="text-ufc-red font-black text-sm">VS</span>
+                <div className="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center"
+                     style={{ background: "rgba(210,10,10,0.12)", border: "1px solid rgba(210,10,10,0.3)" }}>
+                  <span className="text-ufc-red font-black text-xs tracking-widest">VS</span>
                 </div>
                 <div className="flex-1 min-w-0 text-right">
-                  <p className="text-white font-black text-xl sm:text-2xl lg:text-3xl truncate">
+                  <p className="text-white font-black text-2xl sm:text-3xl lg:text-4xl truncate leading-tight">
                     {mainCard[0].fighter2.name}
                   </p>
-                  <p className="text-white/40 text-sm font-mono">
+                  <p className="text-white/35 text-sm font-mono mt-1">
                     {mainCard[0].fighter2.record.wins}-{mainCard[0].fighter2.record.losses}-{mainCard[0].fighter2.record.draws}
                   </p>
                 </div>

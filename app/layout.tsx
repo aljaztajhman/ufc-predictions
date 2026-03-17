@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const viewport: Viewport = {
-  themeColor: "#0A0A0A",
+  themeColor: "#0D0F18",
 };
 
 export const metadata: Metadata = {
@@ -28,36 +28,35 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="dark">
-      <body className={cn(inter.variable, "min-h-screen bg-[#0A0A0A] text-white antialiased")}>
-        {/* Background grid */}
+      <body className={cn(inter.variable, "min-h-screen bg-[#0D0F18] text-white antialiased")}>
+        {/* Subtle background grid */}
         <div
           className="fixed inset-0 pointer-events-none"
           style={{
             backgroundImage: `
-              linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
-              linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)
+              linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px)
             `,
-            backgroundSize: "48px 48px",
+            backgroundSize: "56px 56px",
           }}
         />
-        {/* Red top accent line */}
-        <div className="fixed top-0 left-0 right-0 h-[2px] bg-ufc-red z-50" />
 
         <Navbar />
 
-        <main className="relative z-10 pt-16">
+        <main className="relative z-10 pt-14">
           {children}
         </main>
 
         <footer className="relative z-10 mt-24 border-t border-white/5 py-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-6 h-6 bg-ufc-red rounded-sm flex items-center justify-center">
+              <div className="w-6 h-6 rounded-md flex items-center justify-center"
+                   style={{ background: "linear-gradient(135deg, #D20A0A, #FF2525)" }}>
                 <span className="text-white text-xs font-black">U</span>
               </div>
-              <span className="text-white/40 text-sm">UFC Predictions</span>
+              <span className="text-white/35 text-sm font-medium">UFC Predictions</span>
             </div>
-            <p className="text-white/25 text-xs text-center">
+            <p className="text-white/20 text-xs text-center">
               For entertainment only. Predictions powered by AI — not financial or betting advice.
             </p>
           </div>

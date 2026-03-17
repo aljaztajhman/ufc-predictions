@@ -32,16 +32,18 @@ module.exports = {
         },
         ufc: {
           red: "#D20A0A",
+          "red-bright": "#FF2525",
           "red-dark": "#A00808",
-          "red-glow": "rgba(210, 10, 10, 0.3)",
+          "red-glow": "rgba(210, 10, 10, 0.35)",
           gold: "#F5A623",
-          dark: "#0A0A0A",
-          "dark-2": "#111111",
-          "dark-3": "#1A1A1A",
-          "dark-4": "#222222",
-          gray: "#333333",
-          "gray-2": "#444444",
-          "gray-light": "#888888",
+          // Deep blue-dark palette — more vibrant than pure black
+          dark: "#0D0F18",
+          "dark-2": "#131520",
+          "dark-3": "#1B1D2C",
+          "dark-4": "#232538",
+          gray: "#30324A",
+          "gray-2": "#43456A",
+          "gray-light": "#8E90B0",
         },
       },
       fontFamily: {
@@ -68,23 +70,38 @@ module.exports = {
         },
         "pulse-red": {
           "0%, 100%": { boxShadow: "0 0 0 0 rgba(210, 10, 10, 0)" },
-          "50%": { boxShadow: "0 0 20px 4px rgba(210, 10, 10, 0.4)" },
+          "50%": { boxShadow: "0 0 24px 6px rgba(210, 10, 10, 0.45)" },
         },
         fadeIn: {
-          from: { opacity: "0", transform: "translateY(8px)" },
+          from: { opacity: "0", transform: "translateY(10px)" },
           to: { opacity: "1", transform: "translateY(0)" },
+        },
+        "glow-pulse": {
+          "0%, 100%": { opacity: "0.5" },
+          "50%": { opacity: "1" },
         },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         shimmer: "shimmer 2s infinite linear",
-        "pulse-red": "pulse-red 2s infinite",
+        "pulse-red": "pulse-red 2.5s infinite",
         "fade-in": "fadeIn 0.4s ease-out forwards",
+        "glow-pulse": "glow-pulse 3s ease-in-out infinite",
       },
       backgroundImage: {
         "shimmer-gradient":
-          "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.05) 50%, transparent 100%)",
+          "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.06) 50%, transparent 100%)",
+        "card-gradient":
+          "linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0) 100%)",
+        "red-gradient":
+          "linear-gradient(135deg, #D20A0A 0%, #FF2525 100%)",
+      },
+      boxShadow: {
+        "card": "0 2px 16px rgba(0,0,0,0.4), 0 1px 4px rgba(0,0,0,0.3)",
+        "card-hover": "0 8px 32px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.4)",
+        "red-glow": "0 0 24px rgba(210,10,10,0.3), 0 0 8px rgba(210,10,10,0.2)",
+        "red-glow-lg": "0 0 40px rgba(210,10,10,0.35), 0 0 16px rgba(210,10,10,0.2)",
       },
     },
   },
