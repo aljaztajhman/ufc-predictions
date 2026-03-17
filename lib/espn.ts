@@ -108,6 +108,12 @@ export async function fetchUpcomingEvents(): Promise<UFCEvent[]> {
   const todayMidnight = new Date();
   todayMidnight.setHours(0, 0, 0, 0);
 
+  // Always include hardcoded events as a baseline — ESPN's scoreboard only
+  // covers the current week so it often misses events 3–6 weeks out.
+  const hardcodedUpcoming = getHardcodedUpcomingEvents();
+
+  let espnEvents: UFCEvent[] = [];
+
   try {
     // ESPN scoreboard returns current-week events. Use a wide limit so we
     // catch events a few weeks out, then filter to future dates.
@@ -115,23 +121,27 @@ export async function fetchUpcomingEvents(): Promise<UFCEvent[]> {
       `${ESPN_BASE}/scoreboard?limit=50`
     )) as any;
 
-    const events: UFCEvent[] = (data.events || [])
+    espnEvents = (data.events || [])
       .map(parseEvent)
       .map(enrichEventFromHardcoded)
       .filter((e: UFCEvent) => {
         if (e.status === "completed") return false;
         if (!e.date) return false;
         return new Date(e.date) >= todayMidnight;
-      })
-      .sort(
-        (a: UFCEvent, b: UFCEvent) =>
-          new Date(a.date).getTime() - new Date(b.date).getTime()
-      );
-
-    if (events.length > 0) return events;
+      });
   } catch (err) {
     console.error("ESPN scoreboard error:", err);
   }
+
+  // Merge: start with ESPN events, then add any hardcoded events whose ESPN
+  // IDs aren't already represented (covers events ESPN doesn't return yet).
+  const seenIds = new Set(espnEvents.map((e) => e.id));
+  const supplemental = hardcodedUpcoming.filter((e) => !seenIds.has(e.id));
+  const merged = [...espnEvents, ...supplemental].sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+  );
+
+  if (merged.length > 0) return merged;
 
   // ESPN scoreboard might only cover the current week. Try the core schedule.
   try {
