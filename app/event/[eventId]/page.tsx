@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Calendar, MapPin, Shield } from "lucide-react";
 import { fetchEventWithFights } from "@/lib/espn";
-import { getCachedFights, setCachedFights, getCachedPrediction } from "@/lib/cache";
+import { getCachedData, setCachedData, getCachedPrediction } from "@/lib/cache";
 import { FightSection } from "@/components/event/FightCard";
 import { FightCardSkeleton } from "@/components/ui/Skeleton";
 import { Badge, EventTimeBadge } from "@/components/ui/Badge";
@@ -19,26 +19,16 @@ interface PageProps {
 }
 
 async function getEventData(eventId: string): Promise<EventWithFights | null> {
-  // Check KV for cached fight card first — cron job pre-warms this
-  const cachedFights = await getCachedFights(eventId);
+  const cacheKey = `event:${eventId}`;
+  const cached = await getCachedData<EventWithFights>(cacheKey);
+  if (cached) return cached;
 
-  if (cachedFights) {
-    // Fights are cached — still need event metadata, fetch from ESPN (fast, single call)
-    const data = await fetchEventWithFights(eventId);
-    const event = data?.event;
-    if (!event) return null;
-    return { ...event, fights: cachedFights };
-  }
-
-  // Cache miss — fetch everything from ESPN and populate KV
   const data = await fetchEventWithFights(eventId);
   if (!data) return null;
 
-  if (data.fights.length > 0) {
-    await setCachedFights(eventId, data.fights);
-  }
-
-  return { ...data.event, fights: data.fights };
+  const result: EventWithFights = { ...data.event, fights: data.fights };
+  await setCachedData(cacheKey, result, 1800);
+  return result;
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
