@@ -108,18 +108,59 @@ export async function fetchUpcomingEvents(): Promise<UFCEvent[]> {
   const todayMidnight = new Date();
   todayMidnight.setHours(0, 0, 0, 0);
 
-  // Always include hardcoded events as a baseline — ESPN's scoreboard only
-  // covers the current week so it often misses events 3–6 weeks out.
+  // Format today as YYYYMMDD for the ESPN Core date filter
+  const todayStr = todayMidnight.toISOString().slice(0, 10).replace(/-/g, "");
+
+  // Hardcoded events — kept in sync with announced UFC calendar.
+  // Used to fill in name/mainEvent/location when ESPN data is sparse,
+  // and as a fallback if ESPN APIs are unavailable.
   const hardcodedUpcoming = getHardcodedUpcomingEvents();
 
-  let espnEvents: UFCEvent[] = [];
-
+  // ── PRIMARY: ESPN Core events with future-date filter ─────────────────────
+  // This endpoint returns ALL scheduled UFC events from the given date
+  // forward, not just the current week. It's the most reliable source of
+  // the full upcoming calendar.
   try {
-    // ESPN scoreboard returns current-week events. Use a wide limit so we
-    // catch events a few weeks out, then filter to future dates.
-    const data = (await fetchJSON(
-      `${ESPN_BASE}/scoreboard?limit=50`
+    const scheduleData = (await fetchJSON(
+      `${ESPN_CORE}/events?limit=25&dates=${todayStr}`,
+      3600
     )) as any;
+
+    const refs: string[] = (scheduleData.items || [])
+      .map((i: any) => i.$ref as string)
+      .filter(Boolean);
+
+    if (refs.length > 0) {
+      const evtResults = await Promise.allSettled(
+        refs.slice(0, 20).map((ref) => fetchJSON(ref, 3600))
+      );
+
+      const coreEvents: UFCEvent[] = evtResults
+        .filter((r): r is PromiseFulfilledResult<any> => r.status === "fulfilled")
+        .map((r) => enrichEventFromHardcoded(parseEvent(r.value)))
+        .filter((e: UFCEvent) => {
+          if (e.status === "completed") return false;
+          if (!e.date) return false;
+          return new Date(e.date) >= todayMidnight;
+        });
+
+      if (coreEvents.length > 0) {
+        // Supplement with any hardcoded events not yet in ESPN's system
+        const seenIds = new Set(coreEvents.map((e) => e.id));
+        const supplemental = hardcodedUpcoming.filter((e) => !seenIds.has(e.id));
+        return [...coreEvents, ...supplemental].sort(
+          (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+        );
+      }
+    }
+  } catch (err) {
+    console.error("ESPN core events (primary) error:", err);
+  }
+
+  // ── SECONDARY: ESPN scoreboard (covers current week) ──────────────────────
+  let espnEvents: UFCEvent[] = [];
+  try {
+    const data = (await fetchJSON(`${ESPN_BASE}/scoreboard?limit=50`)) as any;
 
     espnEvents = (data.events || [])
       .map(parseEvent)
@@ -133,8 +174,7 @@ export async function fetchUpcomingEvents(): Promise<UFCEvent[]> {
     console.error("ESPN scoreboard error:", err);
   }
 
-  // Merge: start with ESPN events, then add any hardcoded events whose ESPN
-  // IDs aren't already represented (covers events ESPN doesn't return yet).
+  // Merge scoreboard + hardcoded, deduplicating by ESPN ID
   const seenIds = new Set(espnEvents.map((e) => e.id));
   const supplemental = hardcodedUpcoming.filter((e) => !seenIds.has(e.id));
   const merged = [...espnEvents, ...supplemental].sort(
@@ -143,44 +183,8 @@ export async function fetchUpcomingEvents(): Promise<UFCEvent[]> {
 
   if (merged.length > 0) return merged;
 
-  // ESPN scoreboard might only cover the current week. Try the core schedule.
-  try {
-    const year = new Date().getFullYear();
-    const scheduleData = (await fetchJSON(
-      `${ESPN_CORE}/events?limit=50&dates=${year}`
-    )) as any;
-
-    const refs: string[] = (scheduleData.items || [])
-      .map((i: any) => i.$ref)
-      .filter(Boolean);
-
-    if (refs.length > 0) {
-      const evtResults = await Promise.allSettled(
-        refs.slice(0, 25).map((ref) => fetchJSON(ref, 3600))
-      );
-
-      const events: UFCEvent[] = evtResults
-        .filter(
-          (r): r is PromiseFulfilledResult<any> => r.status === "fulfilled"
-        )
-        .map((r) => enrichEventFromHardcoded(parseEvent(r.value)))
-        .filter((e: UFCEvent) => {
-          if (e.status === "completed") return false;
-          if (!e.date) return false;
-          return new Date(e.date) >= todayMidnight;
-        })
-        .sort(
-          (a: UFCEvent, b: UFCEvent) =>
-            new Date(a.date).getTime() - new Date(b.date).getTime()
-        );
-
-      if (events.length > 0) return events;
-    }
-  } catch (err) {
-    console.error("ESPN core events error:", err);
-  }
-
-  return getHardcodedUpcomingEvents();
+  // ── FALLBACK: hardcoded only ───────────────────────────────────────────────
+  return hardcodedUpcoming;
 }
 
 // ─── Event with fights ─────────────────────────────────────────────────────────
@@ -866,28 +870,84 @@ const HARDCODED_EVENTS: HardcodedEvent[] = [
     ],
   },
 
-  // ── UFC 314: Oliveira vs Chandler 2 — April 12, 2026 ────────────────────
+  // ── UFC Fight Night: Adesanya vs. Pyfer — March 28, 2026 ────────────────
   {
-    espnId: "600058001",
-    name: "UFC 314: Oliveira vs. Chandler 2",
-    shortName: "UFC 314",
-    date: "2026-04-12T22:00:00Z",
-    location: "Kaseya Center, Miami, FL",
-    venue: "Kaseya Center",
-    mainEvent: "Charles Oliveira vs Michael Chandler",
+    espnId: "600057366",
+    name: "UFC Fight Night: Adesanya vs. Pyfer",
+    shortName: "UFC Fight Night",
+    date: "2026-03-28T21:00:00Z",
+    location: "Climate Pledge Arena, Seattle, WA",
+    venue: "Climate Pledge Arena",
+    mainEvent: "Israel Adesanya vs Joe Pyfer",
     card: [
       {
         section: "main",
-        weight: "Lightweight",
-        f1: { name: "Charles Oliveira",    w: 34, l: 9, d: 0, cc: "BR", stance: "Orthodox", slpm: 4.78, sapm: 4.21, strAcc: 50, strDef: 55, tdAvg: 3.53, tdAcc: 36, tdDef: 66, subAvg: 2.2 },
-        f2: { name: "Michael Chandler",    w: 23, l: 8, d: 0, cc: "US", stance: "Orthodox", slpm: 5.64, sapm: 5.63, strAcc: 49, strDef: 54, tdAvg: 2.34, tdAcc: 47, tdDef: 72, subAvg: 0.5 },
+        weight: "Middleweight",
+        f1: { name: "Israel Adesanya",     w: 24, l: 5, d: 0, cc: "NZ", stance: "Orthodox", slpm: 4.31, sapm: 2.71, strAcc: 47, strDef: 60, tdAvg: 0.35, tdAcc: 16, tdDef: 91, subAvg: 0.1 },
+        f2: { name: "Joe Pyfer",           w: 12, l: 2, d: 0, cc: "US", stance: "Orthodox", slpm: 6.20, sapm: 3.80, strAcc: 54, strDef: 56, tdAvg: 0.80, tdAcc: 40, tdDef: 68, subAvg: 0.4 },
+      },
+      {
+        section: "main",
+        weight: "Flyweight",
+        f1: { name: "Alexa Grasso",        w: 16, l: 4, d: 0, cc: "MX", stance: "Orthodox", slpm: 4.80, sapm: 3.20, strAcc: 51, strDef: 57, tdAvg: 1.40, tdAcc: 41, tdDef: 70, subAvg: 1.3 },
+        f2: { name: "Maycee Barber",       w: 15, l: 4, d: 0, cc: "US", stance: "Orthodox", slpm: 5.50, sapm: 4.30, strAcc: 52, strDef: 49, tdAvg: 1.70, tdAcc: 48, tdDef: 61, subAvg: 0.6 },
       },
       {
         section: "main",
         weight: "Featherweight",
+        f1: { name: "Chase Hooper",        w: 14, l: 3, d: 1, cc: "US", stance: "Orthodox", slpm: 2.20, sapm: 2.80, strAcc: 41, strDef: 59, tdAvg: 2.80, tdAcc: 47, tdDef: 71, subAvg: 2.2 },
+        f2: { name: "Lance Gibson Jr.",    w: 16, l: 5, d: 0, cc: "US", stance: "Orthodox", slpm: 4.10, sapm: 3.80, strAcc: 45, strDef: 51, tdAvg: 1.20, tdAcc: 37, tdDef: 60, subAvg: 0.7 },
+      },
+      {
+        section: "main",
+        weight: "Welterweight",
+        f1: { name: "Michael Chiesa",      w: 19, l: 6, d: 0, cc: "US", stance: "Orthodox", slpm: 3.10, sapm: 3.40, strAcc: 42, strDef: 55, tdAvg: 3.20, tdAcc: 38, tdDef: 65, subAvg: 1.4 },
+        f2: { name: "Carlston Harris",     w: 17, l: 5, d: 0, cc: "GY", stance: "Orthodox", slpm: 3.80, sapm: 3.60, strAcc: 46, strDef: 54, tdAvg: 2.10, tdAcc: 42, tdDef: 68, subAvg: 0.8 },
+      },
+    ],
+  },
+
+  // ── UFC 327: Procházka vs. Ulberg — April 11, 2026 ──────────────────────
+  {
+    espnId: "600058745",
+    name: "UFC 327: Procházka vs. Ulberg",
+    shortName: "UFC 327",
+    date: "2026-04-11T22:00:00Z",
+    location: "Kaseya Center, Miami, FL",
+    venue: "Kaseya Center",
+    mainEvent: "Jiří Procházka vs Carlos Ulberg",
+    card: [
+      {
+        section: "main",
+        weight: "Light Heavyweight",
         title: true,
-        f1: { name: "Ilia Topuria",        w: 16, l: 0, d: 0, cc: "GE", stance: "Orthodox", slpm: 5.81, sapm: 1.91, strAcc: 57, strDef: 72, tdAvg: 1.98, tdAcc: 46, tdDef: 80, subAvg: 0.6 },
-        f2: { name: "Diego Lopes",         w: 24, l: 6, d: 0, cc: "BR", stance: "Southpaw", slpm: 5.32, sapm: 3.95, strAcc: 52, strDef: 58, tdAvg: 0.91, tdAcc: 33, tdDef: 71, subAvg: 1.1 },
+        f1: { name: "Jiří Procházka",      w: 30, l: 4, d: 0, cc: "CZ", stance: "Switch",   slpm: 6.39, sapm: 5.17, strAcc: 54, strDef: 56, tdAvg: 0.68, tdAcc: 33, tdDef: 81, subAvg: 0.4 },
+        f2: { name: "Carlos Ulberg",       w: 11, l: 2, d: 0, cc: "NZ", stance: "Orthodox", slpm: 4.82, sapm: 2.12, strAcc: 56, strDef: 68, tdAvg: 0.18, tdAcc: 33, tdDef: 80, subAvg: 0.0 },
+      },
+      {
+        section: "main",
+        weight: "Flyweight",
+        title: true,
+        f1: { name: "Joshua Van",          w: 15, l: 3, d: 0, cc: "AU", stance: "Southpaw", slpm: 3.50, sapm: 3.10, strAcc: 45, strDef: 52, tdAvg: 3.80, tdAcc: 47, tdDef: 70, subAvg: 1.5 },
+        f2: { name: "Tatsuro Taira",       w: 15, l: 0, d: 0, cc: "JP", stance: "Orthodox", slpm: 3.80, sapm: 2.10, strAcc: 49, strDef: 65, tdAvg: 5.20, tdAcc: 55, tdDef: 78, subAvg: 2.8 },
+      },
+      {
+        section: "main",
+        weight: "Light Heavyweight",
+        f1: { name: "Dominick Reyes",      w: 12, l: 5, d: 0, cc: "US", stance: "Orthodox", slpm: 5.20, sapm: 5.10, strAcc: 50, strDef: 53, tdAvg: 0.70, tdAcc: 38, tdDef: 71, subAvg: 0.1 },
+        f2: { name: "Johnny Walker",       w: 21, l: 8, d: 0, cc: "BR", stance: "Southpaw", slpm: 5.40, sapm: 4.80, strAcc: 46, strDef: 51, tdAvg: 0.30, tdAcc: 28, tdDef: 62, subAvg: 0.1 },
+      },
+      {
+        section: "main",
+        weight: "Heavyweight",
+        f1: { name: "Curtis Blaydes",      w: 18, l: 5, d: 0, cc: "US", stance: "Orthodox", slpm: 3.31, sapm: 4.01, strAcc: 47, strDef: 54, tdAvg: 4.88, tdAcc: 50, tdDef: 66, subAvg: 0.8 },
+        f2: { name: "Josh Hokit",          w: 14, l: 4, d: 0, cc: "US", stance: "Orthodox", slpm: 4.10, sapm: 4.50, strAcc: 46, strDef: 49, tdAvg: 2.10, tdAcc: 38, tdDef: 55, subAvg: 0.5 },
+      },
+      {
+        section: "main",
+        weight: "Lightweight",
+        f1: { name: "Beneil Dariush",      w: 22, l: 6, d: 0, cc: "US", stance: "Orthodox", slpm: 4.59, sapm: 3.11, strAcc: 52, strDef: 60, tdAvg: 2.78, tdAcc: 48, tdDef: 76, subAvg: 1.3 },
+        f2: { name: "Manuel Torres",       w: 16, l: 4, d: 0, cc: "MX", stance: "Orthodox", slpm: 5.80, sapm: 4.20, strAcc: 53, strDef: 52, tdAvg: 0.60, tdAcc: 33, tdDef: 58, subAvg: 0.4 },
       },
     ],
   },
