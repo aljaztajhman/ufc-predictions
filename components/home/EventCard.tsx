@@ -69,14 +69,14 @@ export function EventCard({ event, featured = false, index = 0 }: EventCardProps
           </span>
         </div>
 
-        {/* Event name */}
+        {/* Event name — full name for featured, shortName for grid cards */}
         <h3 className={cn(
           "font-black uppercase tracking-tight mb-2 transition-colors leading-tight",
           featured
             ? "text-2xl sm:text-3xl text-white group-hover:text-white"
             : "text-xl text-white/90 group-hover:text-white"
         )}>
-          {event.shortName}
+          {featured ? event.name : event.shortName}
         </h3>
 
         {/* Location */}
