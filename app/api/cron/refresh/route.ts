@@ -19,9 +19,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { fetchUpcomingEvents, fetchEventWithFights } from "@/lib/espn";
 import {
   setCachedEvents,
-  setCachedFights,
+  setCachedEventData,
   isRedisConfigured,
 } from "@/lib/cache";
+import type { EventWithFights } from "@/types";
 
 export const runtime = "nodejs";
 export const maxDuration = 60; // allow up to 60s for full card fetch
@@ -61,20 +62,24 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, log }, { status: 500 });
   }
 
-  // ── Step 2: Fetch + cache full fight card for each upcoming event ──────────
+  // ── Step 2: Fetch + cache full event data for each upcoming event ──────────
+  // Stores complete EventWithFights (metadata + fights) so the event page
+  // never needs to call ESPN — one KV read and it's done.
   const results = await Promise.allSettled(
     events.map(async (event) => {
       const data = await fetchEventWithFights(event.id);
       if (!data) {
-        log.push(`⚠ ${event.name}: no fight data returned`);
+        log.push(`⚠ ${event.name}: no data returned from ESPN`);
         return;
       }
 
+      const eventWithFights: EventWithFights = { ...data.event, fights: data.fights };
+      await setCachedEventData(event.id, eventWithFights);
+
       if (data.fights.length > 0) {
-        await setCachedFights(event.id, data.fights);
         log.push(`✓ ${event.name}: cached ${data.fights.length} fights`);
       } else {
-        log.push(`⚠ ${event.name}: fight card not yet announced`);
+        log.push(`⚠ ${event.name}: fight card not yet announced — cached event metadata only`);
       }
     })
   );

@@ -10,7 +10,7 @@
  *   ufc:prediction:{fightId}      → PredictionResult  TTL: 30 days
  */
 
-import type { PredictionResult, UFCEvent, Fight } from "@/types";
+import type { PredictionResult, UFCEvent, Fight, EventWithFights } from "@/types";
 import { Redis } from "@upstash/redis";
 
 // ─── Redis singleton ──────────────────────────────────────────────────────────
@@ -89,8 +89,9 @@ export const TTL = {
 
 // ─── Key builders ─────────────────────────────────────────────────────────────
 export const KV_KEYS = {
-  upcomingEvents: ()              => "ufc:events:upcoming",
-  eventFights:    (id: string)    => `ufc:event:${id}:fights`,
+  upcomingEvents: ()                => "ufc:events:upcoming",
+  eventData:      (id: string)      => `ufc:event:${id}`,        // full EventWithFights
+  eventFights:    (id: string)      => `ufc:event:${id}:fights`, // legacy compat
   prediction:     (fightId: string) => `ufc:prediction:${fightId}`,
 } as const;
 
@@ -107,6 +108,19 @@ export async function setCachedEvents(events: UFCEvent[]): Promise<void> {
   memSet(key, events, TTL.EVENTS);
 }
 
+// Full event object (metadata + fights) — what the event page needs
+export async function getCachedEventData(eventId: string): Promise<EventWithFights | null> {
+  const key = KV_KEYS.eventData(eventId);
+  return (await kvGet<EventWithFights>(key)) ?? memGet<EventWithFights>(key);
+}
+
+export async function setCachedEventData(eventId: string, data: EventWithFights): Promise<void> {
+  const key = KV_KEYS.eventData(eventId);
+  await kvSet(key, data, TTL.FIGHTS);
+  memSet(key, data, TTL.FIGHTS);
+}
+
+// Legacy: fights-only (still used by cron for backwards compat)
 export async function getCachedFights(eventId: string): Promise<Fight[] | null> {
   const key = KV_KEYS.eventFights(eventId);
   return (await kvGet<Fight[]>(key)) ?? memGet<Fight[]>(key);
