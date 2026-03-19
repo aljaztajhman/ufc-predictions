@@ -65,7 +65,7 @@ export function FightCardItem({ fight, cachedPrediction }: FightCardItemProps) {
             "flex items-center gap-1.5 text-xs transition-colors",
             expanded ? "text-white/60" : "text-white/25 group-hover:text-white/50"
           )}>
-            <span className="hidden sm:block text-[11px] font-medium">AI Prediction</span>
+            <span className="hidden sm:block text-xs font-medium">AI Prediction</span>
             <ChevronDown
               size={14}
               className={cn("transition-transform duration-300", expanded && "rotate-180")}
@@ -97,7 +97,7 @@ export function FightCardItem({ fight, cachedPrediction }: FightCardItemProps) {
                 {formatRecord(fighter1.record.wins, fighter1.record.losses, fighter1.record.draws)}
               </span>
               {fighter1.stance && (
-                <span className="text-white/22 text-[9px] uppercase tracking-wider font-medium border border-white/8 px-1.5 py-0.5 rounded-full">
+                <span className="text-white/35 text-[11px] uppercase tracking-wider font-medium border border-white/10 px-1.5 py-0.5 rounded-full">
                   {fighter1.stance}
                 </span>
               )}
@@ -140,7 +140,7 @@ export function FightCardItem({ fight, cachedPrediction }: FightCardItemProps) {
             </div>
             <div className="flex items-center justify-end gap-2 mr-0.5">
               {fighter2.stance && (
-                <span className="text-white/22 text-[9px] uppercase tracking-wider font-medium border border-white/8 px-1.5 py-0.5 rounded-full">
+                <span className="text-white/35 text-[11px] uppercase tracking-wider font-medium border border-white/10 px-1.5 py-0.5 rounded-full">
                   {fighter2.stance}
                 </span>
               )}
@@ -160,8 +160,8 @@ export function FightCardItem({ fight, cachedPrediction }: FightCardItemProps) {
             <div className="flex items-center justify-between">
               <span className="text-white/70 text-sm font-semibold truncate max-w-[40%]">{fighter1.name}</span>
               <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/5 border border-white/8">
-                <Swords size={10} className="text-white/35" />
-                <span className="text-white/35 text-[9px] uppercase tracking-widest font-semibold">Stats</span>
+                <Swords size={12} className="text-white/50" />
+                <span className="text-white/50 text-xs uppercase tracking-widest font-semibold">Stats</span>
               </div>
               <span className="text-white/70 text-sm font-semibold text-right truncate max-w-[40%]">{fighter2.name}</span>
             </div>

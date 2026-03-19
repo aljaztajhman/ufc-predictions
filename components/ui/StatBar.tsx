@@ -54,7 +54,7 @@ export function StatBar({
         <span className={cn("font-medium", isBetter1 ? "text-white" : "text-white/40")}>
           {fmt(value1)}
         </span>
-        <span className="text-white/35 text-[10px] uppercase tracking-wider">{label}</span>
+        <span className="text-white/50 text-xs uppercase tracking-wider">{label}</span>
         <span className={cn("font-medium", !isBetter1 ? "text-white" : "text-white/40")}>
           {fmt(value2)}
         </span>
@@ -137,7 +137,7 @@ export function StatsComparison({ fighter1, fighter2 }: StatsComparisonProps) {
     <div className="space-y-4">
       {hasStrikingStats && (
         <div className="space-y-3">
-          <h4 className="text-[10px] uppercase tracking-widest text-white/30 font-semibold">
+          <h4 className="text-xs uppercase tracking-widest text-white/50 font-semibold">
             Striking
           </h4>
           <div className="space-y-2.5">
@@ -182,7 +182,7 @@ export function StatsComparison({ fighter1, fighter2 }: StatsComparisonProps) {
 
       {hasGrapplingStats && (
         <div className="space-y-3">
-          <h4 className="text-[10px] uppercase tracking-widest text-white/30 font-semibold">
+          <h4 className="text-xs uppercase tracking-widest text-white/50 font-semibold">
             Grappling
           </h4>
           <div className="space-y-2.5">
