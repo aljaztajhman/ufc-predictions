@@ -65,11 +65,16 @@ function parseEvent(e: any): UFCEvent {
 
   const eventName: string = e.name || e.shortName || "UFC Event";
 
-  // Main event: prefer inline competitor names, then parse from event name
+  // Main event: always prefer the event name first — it's the most reliable
+  // source for upcoming events (e.g. "UFC Fight Night: Evloev vs. Murphy").
+  // ESPN's competitions[0] from the scoreboard is often a prelim fight, not
+  // the headliner, so we only fall back to it when the name has no colon.
+  const nameBasedMainEvent = extractMainEventFromName(eventName);
   const mainEvent =
-    competitorNames.length >= 2
+    nameBasedMainEvent ||
+    (competitorNames.length >= 2
       ? `${competitorNames[0]} vs ${competitorNames[1]}`
-      : extractMainEventFromName(eventName) || "TBD";
+      : "TBD");
 
   const dateStr: string = e.date || competition?.date || "";
 
@@ -118,29 +123,28 @@ function parseEvent(e: any): UFCEvent {
 export async function fetchUpcomingEvents(): Promise<UFCEvent[]> {
   const todayMidnight = new Date();
   todayMidnight.setHours(0, 0, 0, 0);
-
-  // Format today as YYYYMMDD for the ESPN Core date filter
-  const todayStr = todayMidnight.toISOString().slice(0, 10).replace(/-/g, "");
+  const year = todayMidnight.getFullYear();
 
   const isUpcoming = (e: UFCEvent) =>
     e.status !== "completed" && !!e.date && new Date(e.date) >= todayMidnight;
 
-  // ── PRIMARY: ESPN Core /events?dates=YYYYMMDD ──────────────────────────────
-  // Returns ALL scheduled UFC events from today forward (not just current week).
-  // Event names come through as "UFC 327: Procházka vs. Ulberg" — the main
-  // event matchup is parsed directly from the name, no extra fetches needed.
+  // ── PRIMARY: ESPN Core /events?dates=YYYY ──────────────────────────────────
+  // Use the YEAR format (e.g. dates=2026) — confirmed to return all events in
+  // the year. We fetch all refs in parallel, then filter to future dates.
+  // The 8-digit format (dates=YYYYMMDD) is treated as a specific date, not a
+  // range, so it returns 0 results when there's no event on that exact day.
   try {
     const scheduleData = (await fetchJSON(
-      `${ESPN_CORE}/events?limit=25&dates=${todayStr}`,
+      `${ESPN_CORE}/events?limit=100&dates=${year}`,
       3600
     )) as any;
 
     const refs: string[] = (scheduleData.items || [])
       .map((i: any) => i.$ref as string)
-      .filter(Boolean)
-      .slice(0, 20);
+      .filter(Boolean);
 
     if (refs.length > 0) {
+      // Fetch all event objects in parallel — Next.js ISR caches this server-side
       const evtResults = await Promise.allSettled(
         refs.map((ref) => fetchJSON(ref, 3600))
       );
@@ -157,7 +161,7 @@ export async function fetchUpcomingEvents(): Promise<UFCEvent[]> {
     console.error("ESPN Core events error:", err);
   }
 
-  // ── SECONDARY: ESPN site scoreboard (covers current week) ─────────────────
+  // ── SECONDARY: ESPN site scoreboard (covers current week only) ────────────
   try {
     const data = (await fetchJSON(`${ESPN_BASE}/scoreboard?limit=50`)) as any;
     const events: UFCEvent[] = (data.events || [])
