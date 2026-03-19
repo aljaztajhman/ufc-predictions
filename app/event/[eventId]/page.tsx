@@ -139,9 +139,21 @@ async function EventContent({ eventId }: { eventId: string }) {
 
       {/* Fight card sections */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-10">
-        <FightSection title="Main Card" fights={mainCard} predictions={predictions} accent />
-        <FightSection title="Prelims" fights={prelims} predictions={predictions} />
-        <FightSection title="Early Prelims" fights={earlyPrelims} predictions={predictions} />
+        {fights.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/8 flex items-center justify-center mb-4">
+              <span className="text-2xl">🥊</span>
+            </div>
+            <p className="text-white/60 text-base font-semibold">Fight card not yet announced</p>
+            <p className="text-white/30 text-sm mt-1">Check back closer to the event date.</p>
+          </div>
+        ) : (
+          <>
+            <FightSection title="Main Card" fights={mainCard} predictions={predictions} accent />
+            <FightSection title="Prelims" fights={prelims} predictions={predictions} />
+            <FightSection title="Early Prelims" fights={earlyPrelims} predictions={predictions} />
+          </>
+        )}
       </div>
     </>
   );

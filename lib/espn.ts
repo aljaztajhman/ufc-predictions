@@ -44,16 +44,47 @@ function toStr(v: unknown): string {
 
 // ─── Event parsing ─────────────────────────────────────────────────────────────
 
+// ESPN names upcoming events as "UFC 327: Procházka vs. Ulberg" or
+// "UFC Fight Night: Adesanya vs. Pyfer". The main event matchup is
+// everything after the colon — no extra API calls needed.
+function extractMainEventFromName(name: string): string {
+  const colonIdx = name.indexOf(":");
+  if (colonIdx !== -1) {
+    const after = name.slice(colonIdx + 1).trim();
+    if (after) return after;
+  }
+  return "";
+}
+
 function parseEvent(e: any): UFCEvent {
   const competition = e.competitions?.[0];
   const competitors = competition?.competitors || [];
-  const names = competitors.map(
+  const competitorNames = competitors.map(
     (c: any) => c.athlete?.displayName || c.displayName || "TBD"
   );
-  const mainEvent =
-    names.length >= 2 ? `${names[0]} vs ${names[1]}` : e.name || "TBD";
 
-  const dateStr = e.date || competition?.date || "";
+  const eventName: string = e.name || e.shortName || "UFC Event";
+
+  // Main event: prefer inline competitor names, then parse from event name
+  const mainEvent =
+    competitorNames.length >= 2
+      ? `${competitorNames[0]} vs ${competitorNames[1]}`
+      : extractMainEventFromName(eventName) || "TBD";
+
+  const dateStr: string = e.date || competition?.date || "";
+
+  // Location: ESPN Core uses a `venues` array; ESPN site API uses competitions[0].venue
+  const venue =
+    e.venues?.[0]?.fullName ||
+    e.venue?.fullName ||
+    competition?.venue?.fullName ||
+    "";
+  const city =
+    e.venues?.[0]?.address?.city ||
+    competition?.venue?.address?.city ||
+    e.location ||
+    "";
+  const location = venue || city || "TBD";
 
   // An event is completed if ESPN says so, OR if its date was more than
   // 24 hours ago (covers stale events ESPN hasn't marked yet).
@@ -66,15 +97,11 @@ function parseEvent(e: any): UFCEvent {
 
   return {
     id: String(e.id),
-    name: e.name || e.shortName || "UFC Event",
-    shortName: e.shortName || e.name || "UFC Event",
+    name: eventName,
+    shortName: e.shortName || eventName,
     date: dateStr,
-    location:
-      competition?.venue?.fullName ||
-      competition?.venue?.address?.city ||
-      e.location ||
-      "TBD",
-    venue: competition?.venue?.fullName || "TBD",
+    location,
+    venue: venue || "TBD",
     mainEvent,
     imageUrl: e.images?.[0]?.url,
     status:
@@ -83,22 +110,6 @@ function parseEvent(e: any): UFCEvent {
         : isCompleted
         ? "completed"
         : "upcoming",
-  };
-}
-
-// ─── Enrich events with hardcoded data when ESPN is incomplete ────────────────
-
-function enrichEventFromHardcoded(event: UFCEvent): UFCEvent {
-  const hc = HARDCODED_EVENTS.find((h) => h.espnId === event.id);
-  if (!hc) return event;
-  return {
-    ...event,
-    name: hc.name,
-    shortName: hc.shortName,
-    mainEvent: hc.mainEvent,
-    // Only override location/venue if ESPN returned "TBD"
-    location: event.location === "TBD" ? hc.location : event.location,
-    venue: event.venue === "TBD" ? hc.venue : event.venue,
   };
 }
 
@@ -111,15 +122,13 @@ export async function fetchUpcomingEvents(): Promise<UFCEvent[]> {
   // Format today as YYYYMMDD for the ESPN Core date filter
   const todayStr = todayMidnight.toISOString().slice(0, 10).replace(/-/g, "");
 
-  // Hardcoded events — kept in sync with announced UFC calendar.
-  // Used to fill in name/mainEvent/location when ESPN data is sparse,
-  // and as a fallback if ESPN APIs are unavailable.
-  const hardcodedUpcoming = getHardcodedUpcomingEvents();
+  const isUpcoming = (e: UFCEvent) =>
+    e.status !== "completed" && !!e.date && new Date(e.date) >= todayMidnight;
 
-  // ── PRIMARY: ESPN Core events with future-date filter ─────────────────────
-  // This endpoint returns ALL scheduled UFC events from the given date
-  // forward, not just the current week. It's the most reliable source of
-  // the full upcoming calendar.
+  // ── PRIMARY: ESPN Core /events?dates=YYYYMMDD ──────────────────────────────
+  // Returns ALL scheduled UFC events from today forward (not just current week).
+  // Event names come through as "UFC 327: Procházka vs. Ulberg" — the main
+  // event matchup is parsed directly from the name, no extra fetches needed.
   try {
     const scheduleData = (await fetchJSON(
       `${ESPN_CORE}/events?limit=25&dates=${todayStr}`,
@@ -128,63 +137,41 @@ export async function fetchUpcomingEvents(): Promise<UFCEvent[]> {
 
     const refs: string[] = (scheduleData.items || [])
       .map((i: any) => i.$ref as string)
-      .filter(Boolean);
+      .filter(Boolean)
+      .slice(0, 20);
 
     if (refs.length > 0) {
       const evtResults = await Promise.allSettled(
-        refs.slice(0, 20).map((ref) => fetchJSON(ref, 3600))
+        refs.map((ref) => fetchJSON(ref, 3600))
       );
 
-      const coreEvents: UFCEvent[] = evtResults
+      const events: UFCEvent[] = evtResults
         .filter((r): r is PromiseFulfilledResult<any> => r.status === "fulfilled")
-        .map((r) => enrichEventFromHardcoded(parseEvent(r.value)))
-        .filter((e: UFCEvent) => {
-          if (e.status === "completed") return false;
-          if (!e.date) return false;
-          return new Date(e.date) >= todayMidnight;
-        });
+        .map((r) => parseEvent(r.value))
+        .filter(isUpcoming)
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-      if (coreEvents.length > 0) {
-        // Supplement with any hardcoded events not yet in ESPN's system
-        const seenIds = new Set(coreEvents.map((e) => e.id));
-        const supplemental = hardcodedUpcoming.filter((e) => !seenIds.has(e.id));
-        return [...coreEvents, ...supplemental].sort(
-          (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-        );
-      }
+      if (events.length > 0) return events;
     }
   } catch (err) {
-    console.error("ESPN core events (primary) error:", err);
+    console.error("ESPN Core events error:", err);
   }
 
-  // ── SECONDARY: ESPN scoreboard (covers current week) ──────────────────────
-  let espnEvents: UFCEvent[] = [];
+  // ── SECONDARY: ESPN site scoreboard (covers current week) ─────────────────
   try {
     const data = (await fetchJSON(`${ESPN_BASE}/scoreboard?limit=50`)) as any;
-
-    espnEvents = (data.events || [])
+    const events: UFCEvent[] = (data.events || [])
       .map(parseEvent)
-      .map(enrichEventFromHardcoded)
-      .filter((e: UFCEvent) => {
-        if (e.status === "completed") return false;
-        if (!e.date) return false;
-        return new Date(e.date) >= todayMidnight;
-      });
+      .filter(isUpcoming)
+      .sort((a: UFCEvent, b: UFCEvent) =>
+        new Date(a.date).getTime() - new Date(b.date).getTime()
+      );
+    if (events.length > 0) return events;
   } catch (err) {
     console.error("ESPN scoreboard error:", err);
   }
 
-  // Merge scoreboard + hardcoded, deduplicating by ESPN ID
-  const seenIds = new Set(espnEvents.map((e) => e.id));
-  const supplemental = hardcodedUpcoming.filter((e) => !seenIds.has(e.id));
-  const merged = [...espnEvents, ...supplemental].sort(
-    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-  );
-
-  if (merged.length > 0) return merged;
-
-  // ── FALLBACK: hardcoded only ───────────────────────────────────────────────
-  return hardcodedUpcoming;
+  return [];
 }
 
 // ─── Event with fights ─────────────────────────────────────────────────────────
@@ -373,19 +360,20 @@ export async function fetchEventWithFights(
         if (coreIsUsable && coreFights.length > fights.length) {
           fights = coreFights;
 
-          // Build event metadata if ESPN summary didn't provide it
+          // Build event metadata from competitions data if summary didn't provide it
           if (!event) {
             const firstComp = sortedComps[0];
+            const mainEventStr = coreFights[0]
+              ? `${coreFights[0].fighter1.name} vs ${coreFights[0].fighter2.name}`
+              : "TBD";
             event = {
               id: eventId,
-              name: "UFC Event",
+              name: `UFC Event: ${mainEventStr}`,
               shortName: "UFC Event",
               date: firstComp?.date || firstComp?.startDate || new Date().toISOString(),
               location: firstComp?.venue?.fullName || "TBD",
               venue: firstComp?.venue?.fullName || "TBD",
-              mainEvent: coreFights[0]
-                ? `${coreFights[0].fighter1.name} vs ${coreFights[0].fighter2.name}`
-                : "TBD",
+              mainEvent: mainEventStr,
               status: "upcoming",
             };
           }
@@ -396,15 +384,16 @@ export async function fetchEventWithFights(
     }
   }
 
-  // ── Step 3: Use hardcoded if we have no fights, or all fighters are unknown ──
+  // Filter out TBD vs TBD placeholders with no useful data
   const namedFights = fights.filter(
-    (f) => f.fighter1.name !== "Unknown" || f.fighter2.name !== "Unknown"
+    (f) => f.fighter1.name !== "Unknown" && f.fighter2.name !== "Unknown"
   );
-  if (namedFights.length === 0) {
-    return getHardcodedEventFallback(eventId, event);
-  }
 
-  return { event: event!, fights: namedFights };
+  // If we have no event metadata at all, nothing useful to show
+  if (!event) return null;
+
+  // Return what we have — empty fights = "Fight card not yet announced" in UI
+  return { event, fights: namedFights };
 }
 
 // ─── ESPN Core athlete data fetcher ───────────────────────────────────────────
@@ -525,6 +514,15 @@ async function fetchAthleteWithStats(athleteId: string): Promise<Fighter> {
 }
 
 // ─── Fighter parsing (ESPN site API) ──────────────────────────────────────────
+
+// Minimal placeholder when we have a name but no stats yet
+function blankFighter(name: string): Fighter {
+  return {
+    id: name.toLowerCase().replace(/\s+/g, "-"),
+    name,
+    record: { wins: 0, losses: 0, draws: 0 },
+  };
+}
 
 function parseFighter(c: any): Fighter {
   const athlete = c.athlete || c;
@@ -660,295 +658,3 @@ function parseCompetitionsArray(
     .filter((f): f is Fight => f !== null);
 }
 
-// ─── Hardcoded current-event fallback ─────────────────────────────────────────
-// Updated with real cards so the app never shows stale 2024 data.
-
-function getHardcodedUpcomingEvents(): UFCEvent[] {
-  return HARDCODED_EVENTS.map((e) => ({
-    id: e.espnId,
-    name: e.name,
-    shortName: e.shortName,
-    date: e.date,
-    location: e.location,
-    venue: e.venue,
-    mainEvent: e.mainEvent,
-    status: "upcoming" as const,
-  })).filter((e) => new Date(e.date) >= new Date(Date.now() - 86400000));
-}
-
-function getHardcodedEventFallback(
-  eventId: string,
-  partialEvent: UFCEvent | null
-): { event: UFCEvent; fights: Fight[] } | null {
-  // Try to find a matching hardcoded event
-  const hc = HARDCODED_EVENTS.find((e) => e.espnId === eventId);
-
-  if (hc) {
-    const event: UFCEvent = partialEvent ?? {
-      id: eventId,
-      name: hc.name,
-      shortName: hc.shortName,
-      date: hc.date,
-      location: hc.location,
-      venue: hc.venue,
-      mainEvent: hc.mainEvent,
-      status: "upcoming",
-    };
-    return { event, fights: buildFights(eventId, hc.card) };
-  }
-
-  // Unknown event — build a minimal placeholder with the partial event info
-  if (partialEvent) {
-    const nameParts = partialEvent.mainEvent.split(" vs ");
-    const f1Name = nameParts[0]?.trim() || "Fighter 1";
-    const f2Name = nameParts[1]?.trim() || "Fighter 2";
-    return {
-      event: partialEvent,
-      fights: [
-        {
-          id: `${eventId}-0-0`,
-          eventId,
-          order: 0,
-          section: "main",
-          weightClass: "Main Event",
-          isTitleFight: false,
-          isMainEvent: true,
-          fighter1: blankFighter(f1Name),
-          fighter2: blankFighter(f2Name),
-        },
-      ],
-    };
-  }
-
-  return null;
-}
-
-// ─── Hardcoded event cards ─────────────────────────────────────────────────────
-
-interface HardcodedFighter {
-  name: string;
-  w: number;
-  l: number;
-  d?: number;
-  nc?: number;
-  country?: string;
-  cc?: string;
-  height?: string;
-  reach?: string;
-  stance?: string;
-  // UFCStats-style stats (can be enriched later)
-  slpm?: number;
-  sapm?: number;
-  strAcc?: number;
-  strDef?: number;
-  tdAvg?: number;
-  tdAcc?: number;
-  tdDef?: number;
-  subAvg?: number;
-}
-
-interface HardcodedBout {
-  f1: HardcodedFighter;
-  f2: HardcodedFighter;
-  weight: string;
-  title?: boolean;
-  section: Fight["section"];
-}
-
-interface HardcodedEvent {
-  espnId: string;
-  name: string;
-  shortName: string;
-  date: string;
-  location: string;
-  venue: string;
-  mainEvent: string;
-  card: HardcodedBout[];
-}
-
-function hf(d: HardcodedFighter): Fighter {
-  return {
-    id: d.name.toLowerCase().replace(/\s+/g, "-"),
-    name: d.name,
-    record: {
-      wins: d.w,
-      losses: d.l,
-      draws: d.d ?? 0,
-      noContests: d.nc,
-    },
-    nationality: d.country,
-    countryCode: d.cc,
-    height: d.height,
-    reach: d.reach,
-    stance: d.stance,
-    sigStrikesLandedPerMin: d.slpm,
-    sigStrikesAbsorbedPerMin: d.sapm,
-    sigStrikeAccuracy: d.strAcc,
-    sigStrikeDefense: d.strDef,
-    takedownAvgPer15Min: d.tdAvg,
-    takedownAccuracy: d.tdAcc,
-    takedownDefense: d.tdDef,
-    submissionAvgPer15Min: d.subAvg,
-  };
-}
-
-function buildFights(eventId: string, card: HardcodedBout[]): Fight[] {
-  return card.map((b, idx) => ({
-    id: `${eventId}-hc-${idx}`,
-    eventId,
-    order: idx,
-    section: b.section,
-    weightClass: b.weight,
-    isTitleFight: b.title ?? false,
-    isMainEvent: idx === 0,
-    fighter1: hf(b.f1),
-    fighter2: hf(b.f2),
-  }));
-}
-
-function blankFighter(name: string): Fighter {
-  return { id: name.toLowerCase().replace(/\s+/g, "-"), name, record: { wins: 0, losses: 0, draws: 0 } };
-}
-
-// ---------------------------------------------------------------------------
-// Real upcoming events — update this list as new events are announced.
-// ESPN event IDs match what the scoreboard API returns.
-// ---------------------------------------------------------------------------
-const HARDCODED_EVENTS: HardcodedEvent[] = [
-  // ── UFC Fight Night: Evloev vs. Murphy — March 21, 2026 ─────────────────
-  {
-    espnId: "600057365",
-    name: "UFC Fight Night: Evloev vs. Murphy",
-    shortName: "UFC Fight Night",
-    date: "2026-03-21T21:00:00Z",
-    location: "O2 Arena, London, England",
-    venue: "O2 Arena",
-    mainEvent: "Movsar Evloev vs Lerone Murphy",
-    card: [
-      {
-        section: "main",
-        weight: "Featherweight",
-        title: false,
-        f1: { name: "Movsar Evloev",       w: 19, l: 0, d: 0, cc: "RU", stance: "Orthodox", slpm: 4.51, sapm: 2.89, strAcc: 52, strDef: 62, tdAvg: 1.62, tdAcc: 40, tdDef: 77, subAvg: 0.3 },
-        f2: { name: "Lerone Murphy",        w: 17, l: 0, d: 1, cc: "GB", stance: "Orthodox", slpm: 4.10, sapm: 2.54, strAcc: 49, strDef: 65, tdAvg: 0.80, tdAcc: 38, tdDef: 82, subAvg: 0.5 },
-      },
-      {
-        // Co-main: Luke Riley (undefeated GB prospect) vs Michael Aswell
-        section: "main",
-        weight: "Featherweight",
-        f1: { name: "Luke Riley",          w: 12, l: 0, d: 0, cc: "GB", stance: "Orthodox",  slpm: 5.31, sapm: 2.18, strAcc: 54, strDef: 68, tdAvg: 1.44, tdAcc: 48, tdDef: 79, subAvg: 0.4 },
-        f2: { name: "Michael Aswell",      w: 11, l: 3, d: 0, cc: "GB", stance: "Orthodox",  slpm: 4.22, sapm: 3.76, strAcc: 47, strDef: 57, tdAvg: 0.92, tdAcc: 37, tdDef: 63, subAvg: 0.6 },
-      },
-      {
-        section: "main",
-        weight: "Welterweight",
-        f1: { name: "Michael Page",        w: 24, l: 3, d: 0, cc: "GB", stance: "Southpaw", slpm: 5.62, sapm: 3.41, strAcc: 55, strDef: 60, tdAvg: 0.44, tdAcc: 33, tdDef: 74, subAvg: 0.2 },
-        // Sam Patterson — Welsh WW prospect, 1-0 UFC, strong finisher
-        f2: { name: "Sam Patterson",       w: 14, l: 2, d: 1, cc: "GB", stance: "Orthodox",  slpm: 4.54, sapm: 3.28, strAcc: 50, strDef: 59, tdAvg: 0.84, tdAcc: 36, tdDef: 69, subAvg: 0.3 },
-      },
-      {
-        section: "main",
-        weight: "Light Heavyweight",
-        // Iwo Baraniewski — undefeated Polish grappler/wrestler
-        f1: { name: "Iwo Baraniewski",     w: 7,  l: 0, d: 0, cc: "PL", stance: "Orthodox",  slpm: 3.82, sapm: 2.51, strAcc: 48, strDef: 66, tdAvg: 3.24, tdAcc: 53, tdDef: 80, subAvg: 1.2 },
-        // Austen Lane — UFC veteran LHW/HW, real UFCStats career numbers
-        f2: { name: "Austen Lane",         w: 13, l: 7, d: 0, nc: 1, cc: "US", stance: "Orthodox", slpm: 4.24, sapm: 4.89, strAcc: 44, strDef: 49, tdAvg: 0.62, tdAcc: 47, tdDef: 55, subAvg: 0.4 },
-      },
-      {
-        section: "main",
-        weight: "Middleweight",
-        f1: { name: "Roman Dolidze",       w: 15, l: 4, d: 0, cc: "GE", stance: "Orthodox", slpm: 4.88, sapm: 4.12, strAcc: 47, strDef: 55, tdAvg: 1.10, tdAcc: 45, tdDef: 68, subAvg: 0.7 },
-        // Christian Leroy Duncan — unbeaten CW prospect turned UFC MW
-        f2: { name: "Christian Leroy Duncan", w: 13, l: 2, d: 0, cc: "GB", stance: "Southpaw", slpm: 5.14, sapm: 3.61, strAcc: 51, strDef: 57, tdAvg: 0.52, tdAcc: 34, tdDef: 66, subAvg: 0.5 },
-      },
-      {
-        section: "prelim",
-        weight: "Featherweight",
-        f1: { name: "Kurtis Campbell",     w: 12, l: 3, d: 0, cc: "US", stance: "Orthodox",  slpm: 3.98, sapm: 3.54, strAcc: 46, strDef: 58, tdAvg: 1.52, tdAcc: 41, tdDef: 65, subAvg: 0.5 },
-        f2: { name: "Danny Silva",         w: 12, l: 4, d: 0, cc: "BR", stance: "Orthodox",  slpm: 4.81, sapm: 4.12, strAcc: 51, strDef: 55, tdAvg: 0.58, tdAcc: 35, tdDef: 60, subAvg: 0.8 },
-      },
-    ],
-  },
-
-  // ── UFC Fight Night: Adesanya vs. Pyfer — March 28, 2026 ────────────────
-  {
-    espnId: "600057366",
-    name: "UFC Fight Night: Adesanya vs. Pyfer",
-    shortName: "UFC Fight Night",
-    date: "2026-03-28T21:00:00Z",
-    location: "Climate Pledge Arena, Seattle, WA",
-    venue: "Climate Pledge Arena",
-    mainEvent: "Israel Adesanya vs Joe Pyfer",
-    card: [
-      {
-        section: "main",
-        weight: "Middleweight",
-        f1: { name: "Israel Adesanya",     w: 24, l: 5, d: 0, cc: "NZ", stance: "Orthodox", slpm: 4.31, sapm: 2.71, strAcc: 47, strDef: 60, tdAvg: 0.35, tdAcc: 16, tdDef: 91, subAvg: 0.1 },
-        f2: { name: "Joe Pyfer",           w: 12, l: 2, d: 0, cc: "US", stance: "Orthodox", slpm: 6.20, sapm: 3.80, strAcc: 54, strDef: 56, tdAvg: 0.80, tdAcc: 40, tdDef: 68, subAvg: 0.4 },
-      },
-      {
-        section: "main",
-        weight: "Flyweight",
-        f1: { name: "Alexa Grasso",        w: 16, l: 4, d: 0, cc: "MX", stance: "Orthodox", slpm: 4.80, sapm: 3.20, strAcc: 51, strDef: 57, tdAvg: 1.40, tdAcc: 41, tdDef: 70, subAvg: 1.3 },
-        f2: { name: "Maycee Barber",       w: 15, l: 4, d: 0, cc: "US", stance: "Orthodox", slpm: 5.50, sapm: 4.30, strAcc: 52, strDef: 49, tdAvg: 1.70, tdAcc: 48, tdDef: 61, subAvg: 0.6 },
-      },
-      {
-        section: "main",
-        weight: "Featherweight",
-        f1: { name: "Chase Hooper",        w: 14, l: 3, d: 1, cc: "US", stance: "Orthodox", slpm: 2.20, sapm: 2.80, strAcc: 41, strDef: 59, tdAvg: 2.80, tdAcc: 47, tdDef: 71, subAvg: 2.2 },
-        f2: { name: "Lance Gibson Jr.",    w: 16, l: 5, d: 0, cc: "US", stance: "Orthodox", slpm: 4.10, sapm: 3.80, strAcc: 45, strDef: 51, tdAvg: 1.20, tdAcc: 37, tdDef: 60, subAvg: 0.7 },
-      },
-      {
-        section: "main",
-        weight: "Welterweight",
-        f1: { name: "Michael Chiesa",      w: 19, l: 6, d: 0, cc: "US", stance: "Orthodox", slpm: 3.10, sapm: 3.40, strAcc: 42, strDef: 55, tdAvg: 3.20, tdAcc: 38, tdDef: 65, subAvg: 1.4 },
-        f2: { name: "Carlston Harris",     w: 17, l: 5, d: 0, cc: "GY", stance: "Orthodox", slpm: 3.80, sapm: 3.60, strAcc: 46, strDef: 54, tdAvg: 2.10, tdAcc: 42, tdDef: 68, subAvg: 0.8 },
-      },
-    ],
-  },
-
-  // ── UFC 327: Procházka vs. Ulberg — April 11, 2026 ──────────────────────
-  {
-    espnId: "600058745",
-    name: "UFC 327: Procházka vs. Ulberg",
-    shortName: "UFC 327",
-    date: "2026-04-11T22:00:00Z",
-    location: "Kaseya Center, Miami, FL",
-    venue: "Kaseya Center",
-    mainEvent: "Jiří Procházka vs Carlos Ulberg",
-    card: [
-      {
-        section: "main",
-        weight: "Light Heavyweight",
-        title: true,
-        f1: { name: "Jiří Procházka",      w: 30, l: 4, d: 0, cc: "CZ", stance: "Switch",   slpm: 6.39, sapm: 5.17, strAcc: 54, strDef: 56, tdAvg: 0.68, tdAcc: 33, tdDef: 81, subAvg: 0.4 },
-        f2: { name: "Carlos Ulberg",       w: 11, l: 2, d: 0, cc: "NZ", stance: "Orthodox", slpm: 4.82, sapm: 2.12, strAcc: 56, strDef: 68, tdAvg: 0.18, tdAcc: 33, tdDef: 80, subAvg: 0.0 },
-      },
-      {
-        section: "main",
-        weight: "Flyweight",
-        title: true,
-        f1: { name: "Joshua Van",          w: 15, l: 3, d: 0, cc: "AU", stance: "Southpaw", slpm: 3.50, sapm: 3.10, strAcc: 45, strDef: 52, tdAvg: 3.80, tdAcc: 47, tdDef: 70, subAvg: 1.5 },
-        f2: { name: "Tatsuro Taira",       w: 15, l: 0, d: 0, cc: "JP", stance: "Orthodox", slpm: 3.80, sapm: 2.10, strAcc: 49, strDef: 65, tdAvg: 5.20, tdAcc: 55, tdDef: 78, subAvg: 2.8 },
-      },
-      {
-        section: "main",
-        weight: "Light Heavyweight",
-        f1: { name: "Dominick Reyes",      w: 12, l: 5, d: 0, cc: "US", stance: "Orthodox", slpm: 5.20, sapm: 5.10, strAcc: 50, strDef: 53, tdAvg: 0.70, tdAcc: 38, tdDef: 71, subAvg: 0.1 },
-        f2: { name: "Johnny Walker",       w: 21, l: 8, d: 0, cc: "BR", stance: "Southpaw", slpm: 5.40, sapm: 4.80, strAcc: 46, strDef: 51, tdAvg: 0.30, tdAcc: 28, tdDef: 62, subAvg: 0.1 },
-      },
-      {
-        section: "main",
-        weight: "Heavyweight",
-        f1: { name: "Curtis Blaydes",      w: 18, l: 5, d: 0, cc: "US", stance: "Orthodox", slpm: 3.31, sapm: 4.01, strAcc: 47, strDef: 54, tdAvg: 4.88, tdAcc: 50, tdDef: 66, subAvg: 0.8 },
-        f2: { name: "Josh Hokit",          w: 14, l: 4, d: 0, cc: "US", stance: "Orthodox", slpm: 4.10, sapm: 4.50, strAcc: 46, strDef: 49, tdAvg: 2.10, tdAcc: 38, tdDef: 55, subAvg: 0.5 },
-      },
-      {
-        section: "main",
-        weight: "Lightweight",
-        f1: { name: "Beneil Dariush",      w: 22, l: 6, d: 0, cc: "US", stance: "Orthodox", slpm: 4.59, sapm: 3.11, strAcc: 52, strDef: 60, tdAvg: 2.78, tdAcc: 48, tdDef: 76, subAvg: 1.3 },
-        f2: { name: "Manuel Torres",       w: 16, l: 4, d: 0, cc: "MX", stance: "Orthodox", slpm: 5.80, sapm: 4.20, strAcc: 53, strDef: 52, tdAvg: 0.60, tdAcc: 33, tdDef: 58, subAvg: 0.4 },
-      },
-    ],
-  },
-];
