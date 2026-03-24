@@ -6,6 +6,15 @@
   "functions": {
     "app/api/prediction/[fightId]/route.ts": {
       "maxDuration": 30
+    },
+    "app/api/cron/refresh/route.ts": {
+      "maxDuration": 60
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/refresh",
+      "schedule": "0 8 * * *"
+    }
+  ]
 }

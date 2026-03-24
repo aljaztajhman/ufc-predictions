@@ -1,21 +1,22 @@
 import { Suspense } from "react";
 import { fetchUpcomingEvents } from "@/lib/espn";
-import { getCachedData, setCachedData } from "@/lib/cache";
+import { getCachedEvents, setCachedEvents } from "@/lib/cache";
 import { EventCard } from "@/components/home/EventCard";
 import { EventCardSkeleton } from "@/components/ui/Skeleton";
 import type { UFCEvent } from "@/types";
 import { Zap, Calendar } from "lucide-react";
 
-// Re-render this page at most every 30 minutes so event data stays fresh.
-export const revalidate = 1800;
+// ISR as backstop — cron job normally keeps KV warm so this rarely fires.
+export const revalidate = 3600;
 
 async function getEvents(): Promise<UFCEvent[]> {
-  const cacheKey = "events:upcoming";
-  const cached = await getCachedData<UFCEvent[]>(cacheKey);
-  if (cached) return cached;
+  // Cron job pre-warms this key 3× daily — should almost always be a cache hit
+  const cached = await getCachedEvents();
+  if (cached && cached.length > 0) return cached;
 
+  // Cache miss (first deploy, or after KV flush) — fetch live and populate
   const events = await fetchUpcomingEvents();
-  if (events.length > 0) await setCachedData(cacheKey, events);
+  if (events.length > 0) await setCachedEvents(events);
   return events;
 }
 

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Calendar, MapPin, Shield } from "lucide-react";
 import { fetchEventWithFights } from "@/lib/espn";
-import { getCachedData, setCachedData, getCachedPrediction } from "@/lib/cache";
+import { getCachedEventData, setCachedEventData, getCachedPrediction } from "@/lib/cache";
 import { FightSection } from "@/components/event/FightCard";
 import { FightCardSkeleton } from "@/components/ui/Skeleton";
 import { Badge, EventTimeBadge } from "@/components/ui/Badge";
@@ -11,23 +11,26 @@ import { formatEventDate, getEventBadge } from "@/lib/utils";
 import type { PredictionResult, EventWithFights } from "@/types";
 import type { Metadata } from "next";
 
-// Re-render event pages every 30 minutes so fight card changes are picked up.
-export const revalidate = 1800;
+// ISR as backstop — cron pre-warms KV so this rarely fires.
+export const revalidate = 3600;
 
 interface PageProps {
   params: { eventId: string };
 }
 
 async function getEventData(eventId: string): Promise<EventWithFights | null> {
-  const cacheKey = `event:${eventId}`;
-  const cached = await getCachedData<EventWithFights>(cacheKey);
+  // KV hit → zero ESPN calls, instant response
+  const cached = await getCachedEventData(eventId);
   if (cached) return cached;
 
+  // KV miss (first load or after cache flush) → fetch from ESPN + populate KV
   const data = await fetchEventWithFights(eventId);
   if (!data) return null;
 
   const result: EventWithFights = { ...data.event, fights: data.fights };
-  await setCachedData(cacheKey, result, 1800);
+  // Only cache if we have a valid event — empty fight card is fine to cache
+  // (cron will refresh it when ESPN has the full card announced)
+  await setCachedEventData(eventId, result);
   return result;
 }
 
