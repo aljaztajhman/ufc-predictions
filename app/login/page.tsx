@@ -3,8 +3,8 @@
 import { useState, type FormEvent } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Eye, EyeOff, LogIn, UserPlus, KeyRound } from "lucide-react";
-import type { Metadata } from "next";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -156,24 +156,15 @@ export default function LoginPage() {
               <div className="flex-1 h-px bg-white/8" />
             </div>
 
-            {/* Register — placeholder */}
-            <button
-              type="button"
-              disabled
-              title="Coming soon"
-              className="flex items-center justify-center gap-2 w-full py-3 rounded-lg border border-white/10 text-white/30 text-sm font-medium cursor-not-allowed select-none"
+            {/* Register */}
+            <Link
+              href="/register"
+              className="flex items-center justify-center gap-2 w-full py-3 rounded-lg border border-white/10 text-white/60 text-sm font-medium hover:bg-white/[0.06] hover:text-white transition-all"
             >
               <UserPlus size={15} />
               Create Account
-              <span className="text-white/20 text-xs ml-1">(coming soon)</span>
-            </button>
+            </Link>
           </form>
         </div>
 
-        <p className="text-center text-white/15 text-xs mt-6">
-          For entertainment only — not financial or betting advice.
-        </p>
-      </div>
-    </div>
-  );
-}
+     
