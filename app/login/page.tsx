@@ -41,7 +41,6 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-[#0D0F18] flex flex-col items-center justify-center px-4 relative">
-      {/* Background grid — matches rest of app */}
       <div
         className="fixed inset-0 pointer-events-none"
         style={{
@@ -167,4 +166,10 @@ export default function LoginPage() {
           </form>
         </div>
 
-     
+        <p className="text-center text-white/15 text-xs mt-6">
+          For entertainment only — not financial or betting advice.
+        </p>
+      </div>
+    </div>
+  );
+}

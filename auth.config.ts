@@ -27,8 +27,9 @@ export const authConfig = {
       }
 
       // Everything else requires a valid session
-      if (!isLoggedIn) return false; // NextAuth redirects to /login
+      if (!isLoggedIn) return false;
       return true;
     },
   },
-  providers: [], // Providers added in lib/auth.ts — not needed 
+  providers: [],
+} satisfies NextAuthConfig;
