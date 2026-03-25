@@ -4,16 +4,17 @@ import { usePathname } from "next/navigation";
 import { Navbar } from "./Navbar";
 import { SessionGuard } from "./SessionGuard";
 
+const AUTH_PAGES = ["/login", "/register"];
+
 /**
- * Wraps the app shell (Navbar + main + footer) and hides them on the login page.
- * Must be a client component to read the current pathname.
+ * Wraps the app shell (Navbar + main + footer).
+ * Auth pages (login, register) render children only — no chrome.
  */
 export function ClientLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isAuthPage = pathname === "/login";
+  const isAuthPage = AUTH_PAGES.includes(pathname);
 
   if (isAuthPage) {
-    // Login page: render children only — no navbar, no footer, no padding
     return <>{children}</>;
   }
 

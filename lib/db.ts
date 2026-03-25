@@ -1,6 +1,6 @@
 /**
  * Neon PostgreSQL client.
- * Uses @neondatabase/serverless which works in both serverless and edge environments.
+ * Uses @neondatabase/serverless which works in serverless and edge environments.
  */
 
 import { neon } from "@neondatabase/serverless";
