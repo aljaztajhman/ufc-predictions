@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { Navbar } from "./Navbar";
+import { SessionGuard } from "./SessionGuard";
 
 /**
  * Wraps the app shell (Navbar + main + footer) and hides them on the login page.
@@ -18,6 +19,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <>
+      <SessionGuard />
       <Navbar />
       <main className="relative z-10 pt-14">{children}</main>
       <footer className="relative z-10 mt-24 border-t border-white/5 py-8">

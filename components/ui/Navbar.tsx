@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { UserMenu } from "./UserMenu";
 
 export function Navbar() {
   const pathname = usePathname();
@@ -53,6 +54,9 @@ export function Navbar() {
                   AI Powered
                 </span>
               </div>
+
+              {/* User session */}
+              <UserMenu />
             </div>
           </div>
         </nav>

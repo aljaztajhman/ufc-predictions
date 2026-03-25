@@ -11,6 +11,10 @@ import { authConfig } from "@/auth.config";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
+  session: {
+    strategy: "jwt",
+    maxAge: 30 * 60, // JWT lives 30 min — client-side SessionGuard signs out after 5 min idle
+  },
   providers: [
     Credentials({
       credentials: {
