@@ -1,7 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { Navbar } from "@/components/ui/Navbar";
+import { Providers } from "@/components/ui/Providers";
+import { ClientLayout } from "@/components/ui/ClientLayout";
 import { cn } from "@/lib/utils";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
@@ -40,27 +41,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             backgroundSize: "56px 56px",
           }}
         />
-
-        <Navbar />
-
-        <main className="relative z-10 pt-14">
-          {children}
-        </main>
-
-        <footer className="relative z-10 mt-24 border-t border-white/5 py-8">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-6 h-6 rounded-md flex items-center justify-center"
-                   style={{ background: "linear-gradient(135deg, #D20A0A, #FF2525)" }}>
-                <span className="text-white text-xs font-black">U</span>
-              </div>
-              <span className="text-white/35 text-sm font-medium">UFC Predictions</span>
-            </div>
-            <p className="text-white/20 text-xs text-center">
-              For entertainment only. Predictions powered by AI — not financial or betting advice.
-            </p>
-          </div>
-        </footer>
+        <Providers>
+          <ClientLayout>{children}</ClientLayout>
+        </Providers>
       </body>
     </html>
   );
