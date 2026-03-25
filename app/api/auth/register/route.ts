@@ -63,13 +63,12 @@ export async function POST(req: NextRequest) {
   try {
     const hash = await bcrypt.hash(password, 12);
     await sql`
-      INSERT INTO users (username, email, password_hash, role, subscription_status)
+      INSERT INTO users (username, email, password_hash, role)
       VALUES (
         ${username.trim()},
         ${email.trim().toLowerCase()},
         ${hash},
-        'user',
-        'free'
+        'user'
       )
     `;
   } catch (err) {
