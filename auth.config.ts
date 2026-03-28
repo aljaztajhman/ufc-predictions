@@ -20,16 +20,16 @@ export const authConfig = {
       // Allow cron endpoints — protected by their own CRON_SECRET
       if (pathname.startsWith("/api/cron")) return true;
 
-      // Login page: allow unauthenticated, redirect logged-in users to home
-      if (pathname === "/login") {
+      // Auth pages: allow unauthenticated, redirect logged-in users to home
+      if (pathname === "/login" || pathname === "/register") {
         if (isLoggedIn) return Response.redirect(new URL("/", nextUrl));
         return true;
       }
 
       // Everything else requires a valid session
-      if (!isLoggedIn) return false; // NextAuth redirects to /login
+      if (!isLoggedIn) return false;
       return true;
     },
   },
-  providers: [], // Providers added in lib/auth.ts — not needed here
+  providers: [],
 } satisfies NextAuthConfig;
