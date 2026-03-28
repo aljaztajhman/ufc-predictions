@@ -2,11 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ClipboardList } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { UserMenu } from "./UserMenu";
+import { useSlip } from "@/contexts/SlipContext";
 
 export function Navbar() {
   const pathname = usePathname();
+  const { picks, drawerOpen, setDrawerOpen } = useSlip();
+  const pickCount = picks.length;
 
   return (
     <header className="fixed top-0 left-0 right-0 z-40">
@@ -28,7 +32,7 @@ export function Navbar() {
             </Link>
 
             {/* Nav right */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               <Link
                 href="/"
                 className={cn(
@@ -41,9 +45,9 @@ export function Navbar() {
                 Events
               </Link>
 
-              {/* AI badge */}
+              {/* AI badge — hidden on small screens to save space */}
               <div
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border"
+                className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full border"
                 style={{
                   background: "rgba(210,10,10,0.1)",
                   borderColor: "rgba(210,10,10,0.25)",
@@ -54,6 +58,31 @@ export function Navbar() {
                   AI Powered
                 </span>
               </div>
+
+              {/* Slip button */}
+              <button
+                onClick={() => setDrawerOpen(!drawerOpen)}
+                className={cn(
+                  "relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-all duration-200",
+                  drawerOpen
+                    ? "text-white bg-white/10 border-white/15"
+                    : pickCount > 0
+                    ? "border-[#D20A0A]/35 bg-[#D20A0A]/8 text-white/80 hover:bg-[#D20A0A]/12"
+                    : "text-white/45 border-white/8 bg-transparent hover:text-white/70 hover:bg-white/6"
+                )}
+                aria-label="Open prediction slip"
+              >
+                <ClipboardList size={14} className={pickCount > 0 && !drawerOpen ? "text-[#FF2525]" : ""} />
+                <span className="hidden sm:block">Slip</span>
+                {pickCount > 0 && (
+                  <span
+                    className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-black text-white leading-none"
+                    style={{ background: "linear-gradient(135deg, #D20A0A, #FF2525)" }}
+                  >
+                    {pickCount}
+                  </span>
+                )}
+              </button>
 
               <UserMenu />
             </div>

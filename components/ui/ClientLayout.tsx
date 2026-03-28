@@ -3,11 +3,12 @@
 import { usePathname } from "next/navigation";
 import { Navbar } from "./Navbar";
 import { SessionGuard } from "./SessionGuard";
+import { SlipDrawer } from "@/components/slip/SlipDrawer";
 
 const AUTH_PAGES = ["/login", "/register"];
 
 /**
- * Wraps the app shell (Navbar + main + footer).
+ * Wraps the app shell (Navbar + main + footer + SlipDrawer).
  * Auth pages (login, register) render children only — no chrome.
  */
 export function ClientLayout({ children }: { children: React.ReactNode }) {
@@ -39,6 +40,8 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
           </p>
         </div>
       </footer>
+      {/* Slip drawer — always mounted, visible on all non-auth pages */}
+      <SlipDrawer />
     </>
   );
 }

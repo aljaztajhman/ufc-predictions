@@ -4,11 +4,12 @@ import Link from "next/link";
 import { ArrowLeft, Calendar, MapPin, Shield } from "lucide-react";
 import { fetchEventWithFights } from "@/lib/espn";
 import { getCachedEventData, setCachedEventData, getCachedPrediction } from "@/lib/cache";
+import { fetchAllMMAOdds, mapOddsToFight } from "@/lib/odds";
 import { FightSection } from "@/components/event/FightCard";
 import { FightCardSkeleton } from "@/components/ui/Skeleton";
 import { Badge, EventTimeBadge } from "@/components/ui/Badge";
 import { formatEventDate, getEventBadge } from "@/lib/utils";
-import type { PredictionResult, EventWithFights } from "@/types";
+import type { PredictionResult, EventWithFights, FightOdds } from "@/types";
 import type { Metadata } from "next";
 
 // ISR as backstop — cron pre-warms KV so this rarely fires.
@@ -23,13 +24,11 @@ async function getEventData(eventId: string): Promise<EventWithFights | null> {
   const cached = await getCachedEventData(eventId);
   if (cached) return cached;
 
-  // KV miss (first load or after cache flush) → fetch from ESPN + populate KV
+  // KV miss → fetch from ESPN + populate KV
   const data = await fetchEventWithFights(eventId);
   if (!data) return null;
 
   const result: EventWithFights = { ...data.event, fights: data.fights };
-  // Only cache if we have a valid event — empty fight card is fine to cache
-  // (cron will refresh it when ESPN has the full card announced)
   await setCachedEventData(eventId, result);
   return result;
 }
@@ -53,12 +52,20 @@ async function EventContent({ eventId }: { eventId: string }) {
   const prelims = fights.filter((f) => f.section === "prelim").sort((a, b) => a.order - b.order);
   const earlyPrelims = fights.filter((f) => f.section === "early-prelim").sort((a, b) => a.order - b.order);
 
-  // Load any cached predictions server-side
+  // Load cached predictions server-side
   const allFights = [...mainCard, ...prelims, ...earlyPrelims];
   const predictionEntries = await Promise.all(
     allFights.map(async (f) => [f.id, await getCachedPrediction(f.id)] as [string, PredictionResult | null])
   );
   const predictions = Object.fromEntries(predictionEntries);
+
+  // Load live odds — matches fighters by name, graceful if API key missing
+  const oddsEvents = await fetchAllMMAOdds();
+  const fightOddsEntries: [string, FightOdds | null][] = allFights.map((f) => [
+    f.id,
+    mapOddsToFight(oddsEvents, f.fighter1.name, f.fighter2.name),
+  ]);
+  const fightOdds = Object.fromEntries(fightOddsEntries);
 
   const timeBadge = getEventBadge(data.date);
 
@@ -152,9 +159,31 @@ async function EventContent({ eventId }: { eventId: string }) {
           </div>
         ) : (
           <>
-            <FightSection title="Main Card" fights={mainCard} predictions={predictions} accent />
-            <FightSection title="Prelims" fights={prelims} predictions={predictions} />
-            <FightSection title="Early Prelims" fights={earlyPrelims} predictions={predictions} />
+            <FightSection
+              title="Main Card"
+              fights={mainCard}
+              predictions={predictions}
+              fightOdds={fightOdds}
+              eventName={data.name}
+              eventDate={data.date}
+              accent
+            />
+            <FightSection
+              title="Prelims"
+              fights={prelims}
+              predictions={predictions}
+              fightOdds={fightOdds}
+              eventName={data.name}
+              eventDate={data.date}
+            />
+            <FightSection
+              title="Early Prelims"
+              fights={earlyPrelims}
+              predictions={predictions}
+              fightOdds={fightOdds}
+              eventName={data.name}
+              eventDate={data.date}
+            />
           </>
         )}
       </div>

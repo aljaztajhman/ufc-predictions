@@ -86,3 +86,53 @@ export interface FighterBreakdown {
 export interface EventWithFights extends UFCEvent {
   fights: Fight[];
 }
+
+// ─── Odds types ───────────────────────────────────────────────────────────────
+
+export interface FighterOdds {
+  name: string;
+  decimalOdds: number;        // e.g. 1.67
+  americanOdds: number;       // e.g. -150 (favourite) or +130 (underdog)
+  impliedProbability: number; // 0-100, vig-removed consensus probability
+}
+
+export interface FightOdds {
+  fighter1: FighterOdds;
+  fighter2: FighterOdds;
+  bookmakerCount: number;     // how many bookmakers contributed to the average
+}
+
+// ─── Slip types ───────────────────────────────────────────────────────────────
+
+export type SlipMethod = "any" | "KO/TKO" | "Submission" | "Decision";
+
+export interface SlipPick {
+  fightId: string;
+  eventId: string;
+  eventName: string;
+  eventDate: string;
+  fighter1: { id: string; name: string; record: FighterRecord };
+  fighter2: { id: string; name: string; record: FighterRecord };
+  weightClass: string;
+  isTitleFight: boolean;
+  pickedFighterId: string;
+  pickedFighterName: string;
+  pickedMethod: SlipMethod;
+  addedAt: number;
+  // Enriched after accumulator analysis:
+  aiPrediction?: PredictionResult;
+  pickProbability?: number; // 0-100: P(this specific pick is correct)
+  matchesAI?: boolean;      // does user's pick match AI's predicted winner?
+  odds?: FightOdds;         // market odds for this fight
+  aiEdge?: number;          // pickProbability - market implied probability (signed)
+}
+
+export interface AccumulatorAnalysis {
+  picks: SlipPick[];           // enriched picks with probabilities + odds
+  combinedProbability: number; // product of individual pick probabilities (0-100)
+  aiOverallScore: number;      // Claude's holistic assessment (0-100)
+  riskLevel: "safe" | "risky" | "longshot" | "miracle";
+  parlayOddsDecimal: number;   // theoretical payout multiplier
+  narrative: string;           // Claude's written assessment
+  generatedAt: string;         // ISO string
+}
