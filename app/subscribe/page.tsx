@@ -191,7 +191,7 @@ export default function SubscribePage() {
         {status === "unauthenticated" && (
           <div className="mt-5 text-center">
             <p className="text-white/45 text-sm">
-              Don't have an account?{" "}
+              Don&apos;t have an account?{" "}
               <Link href="/register" className="text-[#FF4444] hover:text-[#FF2525] font-medium transition-colors">
                 Register
               </Link>

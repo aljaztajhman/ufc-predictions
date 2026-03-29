@@ -323,7 +323,7 @@ export default function RegisterPage() {
         </div>
         <div>
           <p className="text-white font-semibold text-sm">Monthly Subscription</p>
-          <p className="text-white/55 text-xs">€20/month — you'll complete payment on Stripe</p>
+          <p className="text-white/55 text-xs">€20/month — you&apos;ll complete payment on Stripe</p>
         </div>
       </div>
 

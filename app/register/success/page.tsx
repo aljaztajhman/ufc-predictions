@@ -98,7 +98,7 @@ function SuccessContent() {
           <div>
             <h2 className="text-white text-xl font-bold mb-2">Almost there!</h2>
             <p className="text-white/55 text-sm leading-relaxed max-w-xs mx-auto">
-              Your payment was received. It may take a moment to activate your account — please sign in and if access isn't available yet, wait a minute and try again.
+              Your payment was received. It may take a moment to activate your account — please sign in and if access isn&apos;t available yet, wait a minute and try again.
             </p>
           </div>
           <Link
