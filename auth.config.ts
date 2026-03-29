@@ -60,6 +60,10 @@ export const authConfig = {
       // Allow public API routes
       if (pathname === "/api/events" || pathname.startsWith("/api/odds")) return true;
 
+      // Allow Stripe routes (checkout needs unauthenticated access for registration,
+      // webhook is called by Stripe servers with no session)
+      if (pathname.startsWith("/api/stripe")) return true;
+
       // Auth pages: allow unauthenticated, redirect logged-in users home
       if (pathname === "/login" || pathname === "/register") {
         if (isLoggedIn) return Response.redirect(new URL("/", nextUrl));
