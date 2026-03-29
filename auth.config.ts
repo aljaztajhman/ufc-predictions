@@ -36,6 +36,16 @@ export const authConfig = {
   session: { strategy: "jwt" as const },
   pages: { signIn: "/login" },
   callbacks: {
+    // Map JWT token fields → session.user so middleware can read them
+    session({ session, token }: any) {
+      if (session.user) {
+        session.user.id                    = token.id;
+        session.user.role                  = token.role;
+        session.user.subscriptionStatus    = token.subscriptionStatus ?? "free";
+        session.user.subscriptionExpiresAt = token.subscriptionExpiresAt ?? null;
+      }
+      return session;
+    },
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user;
       const { pathname } = nextUrl;

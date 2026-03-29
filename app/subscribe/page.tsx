@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -26,6 +26,14 @@ export default function SubscribePage() {
   const isExpired   = subStatus === "expired"   || subStatus === "cancelled";
   const isPending   = subStatus === "pending";
   const isNotSub    = subStatus === "free" || subStatus === "unknown";
+  const hasAccess   = subStatus === "lifetime" || subStatus === "active";
+
+  // Already subscribed — send home
+  useEffect(() => {
+    if (status === "authenticated" && hasAccess) {
+      router.replace("/");
+    }
+  }, [status, hasAccess, router]);
 
   async function handleSubscribe() {
     if (status !== "authenticated") {
