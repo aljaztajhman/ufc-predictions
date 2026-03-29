@@ -137,7 +137,7 @@ export function FightPickModal({
         </p>
 
         {/* Record */}
-        <p className="text-[11px] text-white/30 font-mono relative z-10">
+        <p className="text-xs text-white/45 font-mono relative z-10">
           {formatRecord(fighter.record.wins, fighter.record.losses, fighter.record.draws)}
         </p>
 
@@ -156,7 +156,7 @@ export function FightPickModal({
                 : <TrendingUp size={11} className="text-blue-400/70" />
               }
             </div>
-            <p className="text-[10px] text-white/30">
+            <p className="text-xs text-white/50">
               {fighterOdds.impliedProbability}% implied
             </p>
           </div>
@@ -194,11 +194,11 @@ export function FightPickModal({
               {fight.isTitleFight && (
                 <Trophy size={12} className="text-yellow-400" />
               )}
-              <span className="text-[10px] text-white/35 font-medium uppercase tracking-widest">
+              <span className="text-xs text-white/55 font-medium uppercase tracking-widest">
                 {fight.weightClass}{fight.isTitleFight ? " · Title Fight" : ""}
               </span>
             </div>
-            <p className="text-white/50 text-xs">{eventName}</p>
+            <p className="text-white/65 text-xs">{eventName}</p>
           </div>
           <button
             onClick={onClose}
@@ -226,14 +226,14 @@ export function FightPickModal({
 
         {/* Bookmaker note */}
         {odds && (
-          <p className="px-5 text-[10px] text-white/20 mb-4">
+          <p className="px-5 text-xs text-white/35 mb-4">
             Odds from {odds.bookmakerCount} bookmaker{odds.bookmakerCount !== 1 ? "s" : ""} (consensus average)
           </p>
         )}
 
         {/* Method selector */}
         <div className="px-5 mb-5">
-          <p className="text-[10px] text-white/35 font-medium uppercase tracking-widest mb-2">
+          <p className="text-xs text-white/55 font-medium uppercase tracking-widest mb-2">
             Win method (optional)
           </p>
           <div className="flex flex-wrap gap-1.5">

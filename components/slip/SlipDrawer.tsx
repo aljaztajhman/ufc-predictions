@@ -119,7 +119,7 @@ export function SlipDrawer() {
               <h2 className="text-white font-bold text-base leading-tight">
                 Prediction Slip
               </h2>
-              <p className="text-white/35 text-xs mt-0.5">
+              <p className="text-white/50 text-xs mt-0.5">
                 {pickCount === 0
                   ? "No picks yet"
                   : pickCount === 1
@@ -154,10 +154,10 @@ export function SlipDrawer() {
               <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/8 flex items-center justify-center mb-4">
                 <ClipboardList size={24} className="text-white/20" />
               </div>
-              <p className="text-white/55 font-semibold text-base mb-2">Your slip is empty</p>
-              <p className="text-white/30 text-sm leading-relaxed">
+              <p className="text-white/70 font-semibold text-base mb-2">Your slip is empty</p>
+              <p className="text-white/45 text-sm leading-relaxed">
                 Browse an event and tap{" "}
-                <span className="text-white/50 font-medium">+ Add to Slip</span>{" "}
+                <span className="text-white/65 font-medium">+ Add to Slip</span>{" "}
                 on any fight to build your accumulator.
               </p>
             </div>
@@ -182,7 +182,7 @@ export function SlipDrawer() {
         {/* ── Footer: analyze button ────────────────────────────────────── */}
         {pickCount > 0 && (
           <div className="px-4 pb-6 pt-3 border-t border-white/6 flex-shrink-0">
-            <p className="text-center text-xs text-white/30 mb-3">
+            <p className="text-center text-xs text-white/45 mb-3">
               {pickCount === 1 ? "Single fight prediction" : `${pickCount}-fight accumulator`}
             </p>
             <button

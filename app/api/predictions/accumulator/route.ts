@@ -26,12 +26,13 @@ export const maxDuration = 60; // up to 60s — may need to generate several pre
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// ─── Risk level from combined probability ─────────────────────────────────────
+// ─── Risk level from slip score (average AI confidence) ──────────────────────
+// Based on average pick quality, not the compounding parlay math.
 
-function getRiskLevel(prob: number): AccumulatorAnalysis["riskLevel"] {
-  if (prob >= 60) return "safe";
-  if (prob >= 35) return "risky";
-  if (prob >= 15) return "longshot";
+function getRiskLevel(slipScore: number): AccumulatorAnalysis["riskLevel"] {
+  if (slipScore >= 65) return "safe";
+  if (slipScore >= 55) return "risky";
+  if (slipScore >= 45) return "longshot";
   return "miracle";
 }
 
@@ -120,12 +121,24 @@ export async function POST(req: NextRequest) {
     })
   );
 
-  // ── Step 2: Combined probability ──────────────────────────────────────────
+  // ── Step 2: Slip score (average AI confidence) + combined parlay probability ─
+  const slipScore = Math.round(
+    enrichedPicks.reduce((sum, pick) => sum + (pick.pickProbability ?? 50), 0) /
+      enrichedPicks.length
+  );
+
   const combinedDecimal = enrichedPicks.reduce(
     (acc, pick) => acc * ((pick.pickProbability ?? 50) / 100),
     1
   );
-  const combinedProbability = Math.round(combinedDecimal * 1000) / 10; // 1 decimal place
+  const combinedProbability = Math.round(combinedDecimal * 1000) / 10; // 1 decimal
+
+  // Total AI edge: sum of per-pick edges (only where odds were available)
+  const edgePicks = enrichedPicks.filter((p) => p.aiEdge !== undefined);
+  const totalAiEdge =
+    edgePicks.length > 0
+      ? Math.round(edgePicks.reduce((sum, p) => sum + (p.aiEdge ?? 0), 0))
+      : undefined;
 
   // ── Step 3: Parlay odds ───────────────────────────────────────────────────
   const parlayOddsDecimal = enrichedPicks.reduce((acc, pick) => {
@@ -143,7 +156,7 @@ export async function POST(req: NextRequest) {
   }, 1);
 
   // ── Step 4: Claude narrative ──────────────────────────────────────────────
-  const riskLevel = getRiskLevel(combinedProbability);
+  const riskLevel = getRiskLevel(slipScore);
 
   const picksDesc = enrichedPicks
     .map((pick, i) => {
@@ -183,7 +196,9 @@ export async function POST(req: NextRequest) {
           content:
             `Evaluate this ${enrichedPicks.length}-fight accumulator:\n\n` +
             picksDesc +
-            `\n\nStatistical combined probability: ${combinedProbability}%\n` +
+            `\n\nSlip score (average AI confidence): ${slipScore}%\n` +
+            `Parlay probability (compounded): ${combinedProbability}%\n` +
+            (totalAiEdge !== undefined ? `Total AI edge vs market: ${totalAiEdge > 0 ? "+" : ""}${totalAiEdge}%\n` : "") +
             `Risk level: ${riskLevel}\n\n` +
             `Respond with exactly this JSON: ` +
             `{"aiOverallScore": <integer 0-100>, "narrative": "<2-3 sentence assessment of this slip>"}`,
@@ -206,6 +221,8 @@ export async function POST(req: NextRequest) {
   const result: AccumulatorAnalysis = {
     picks: enrichedPicks,
     combinedProbability,
+    slipScore,
+    totalAiEdge,
     aiOverallScore,
     riskLevel,
     parlayOddsDecimal: Math.round(parlayOddsDecimal * 100) / 100,

@@ -172,7 +172,9 @@ export interface SlipPick {
 
 export interface AccumulatorAnalysis {
   picks: SlipPick[];           // enriched picks with probabilities + odds
-  combinedProbability: number; // product of individual pick probabilities (0-100)
+  combinedProbability: number; // product of individual pick probabilities (0-100) — parlay math
+  slipScore: number;           // average AI confidence across all picks (0-100) — primary display
+  totalAiEdge?: number;        // sum of per-pick AI edges vs market (signed %)
   aiOverallScore: number;      // Claude's holistic assessment (0-100)
   riskLevel: "safe" | "risky" | "longshot" | "miracle";
   parlayOddsDecimal: number;   // theoretical payout multiplier

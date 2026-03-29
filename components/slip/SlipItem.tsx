@@ -50,7 +50,7 @@ export function SlipItem({ pick }: SlipItemProps) {
         {/* Header row: weight class + remove */}
         <div className="flex items-center justify-between mb-2.5">
           <div className="flex items-center gap-1.5">
-            <span className="text-xs text-white/40 font-semibold uppercase tracking-wider">
+            <span className="text-xs text-white/55 font-semibold uppercase tracking-wider">
               {pick.weightClass}
             </span>
             {pick.isTitleFight && (
@@ -83,7 +83,7 @@ export function SlipItem({ pick }: SlipItemProps) {
             )}>
               {pick.fighter1.name}
             </p>
-            <p className="text-[11px] text-white/30 font-mono mt-0.5">
+            <p className="text-xs text-white/45 font-mono mt-0.5">
               {pick.fighter1.record.wins}-{pick.fighter1.record.losses}-{pick.fighter1.record.draws}
             </p>
           </div>
@@ -105,7 +105,7 @@ export function SlipItem({ pick }: SlipItemProps) {
             )}>
               {pick.fighter2.name}
             </p>
-            <p className="text-[11px] text-white/30 font-mono mt-0.5">
+            <p className="text-xs text-white/45 font-mono mt-0.5">
               {pick.fighter2.record.wins}-{pick.fighter2.record.losses}-{pick.fighter2.record.draws}
             </p>
           </div>
@@ -124,7 +124,7 @@ export function SlipItem({ pick }: SlipItemProps) {
             {/* Pick probability bar */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs text-white/45 font-medium">AI pick probability</span>
+                <span className="text-xs text-white/60 font-medium">AI pick probability</span>
                 <span
                   className="text-sm font-bold tabular-nums"
                   style={{ color: probColour(pick.pickProbability!) }}
@@ -147,11 +147,11 @@ export function SlipItem({ pick }: SlipItemProps) {
             {pickedOdds && (
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-white/35">Odds</span>
-                  <span className="text-sm font-mono font-semibold text-white/75">
+                  <span className="text-xs text-white/50">Odds</span>
+                  <span className="text-sm font-mono font-semibold text-white/85">
                     {formatAmericanOdds(pickedOdds.americanOdds)}
                   </span>
-                  <span className="text-xs text-white/30">
+                  <span className="text-xs text-white/45">
                     ({pickedOdds.impliedProbability}% mkt)
                   </span>
                 </div>
