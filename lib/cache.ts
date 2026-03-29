@@ -89,10 +89,11 @@ export const TTL = {
 
 // ─── Key builders ─────────────────────────────────────────────────────────────
 export const KV_KEYS = {
-  upcomingEvents: ()                => "ufc:events:upcoming",
-  eventData:      (id: string)      => `ufc:event:${id}`,        // full EventWithFights
-  eventFights:    (id: string)      => `ufc:event:${id}:fights`, // legacy compat
-  prediction:     (fightId: string) => `ufc:prediction:${fightId}`,
+  upcomingEvents:   ()                => "ufc:events:upcoming",
+  eventData:        (id: string)      => `ufc:event:${id}`,        // full EventWithFights
+  eventFights:      (id: string)      => `ufc:event:${id}:fights`, // legacy compat
+  prediction:       (fightId: string) => `ufc:prediction:${fightId}`,     // v1 (legacy read)
+  predictionV2:     (fightId: string) => `ufc:prediction:v2:${fightId}`,  // v2 (current write)
 } as const;
 
 // ─── Typed public API ─────────────────────────────────────────────────────────
@@ -133,12 +134,18 @@ export async function setCachedFights(eventId: string, fights: Fight[]): Promise
 }
 
 export async function getCachedPrediction(fightId: string): Promise<PredictionResult | null> {
-  const key = KV_KEYS.prediction(fightId);
-  return (await kvGet<PredictionResult>(key)) ?? memGet<PredictionResult>(key);
+  // Try v2 key first; fall back to legacy v1 for predictions cached before the upgrade
+  const v2Key = KV_KEYS.predictionV2(fightId);
+  const v2 = (await kvGet<PredictionResult>(v2Key)) ?? memGet<PredictionResult>(v2Key);
+  if (v2) return v2;
+
+  const v1Key = KV_KEYS.prediction(fightId);
+  return (await kvGet<PredictionResult>(v1Key)) ?? memGet<PredictionResult>(v1Key);
 }
 
 export async function setCachedPrediction(fightId: string, prediction: PredictionResult): Promise<void> {
-  const key = KV_KEYS.prediction(fightId);
+  // Always write to v2 only — no need to dual-write v1
+  const key = KV_KEYS.predictionV2(fightId);
   await kvSet(key, prediction, TTL.PREDICTION);
   memSet(key, prediction, TTL.PREDICTION);
 }

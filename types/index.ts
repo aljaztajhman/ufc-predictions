@@ -21,6 +21,9 @@ export interface Fighter {
   reach?: string;
   stance?: "Orthodox" | "Southpaw" | "Switch" | string;
   imageUrl?: string;
+  // Age / career context
+  age?: number;              // computed from DOB
+  careerStartDate?: string;  // ISO string — date of oldest known fight
   // Striking stats
   sigStrikesLandedPerMin?: number;
   sigStrikesAbsorbedPerMin?: number;
@@ -85,6 +88,46 @@ export interface FighterBreakdown {
 
 export interface EventWithFights extends UFCEvent {
   fights: Fight[];
+}
+
+// ─── Signal types ─────────────────────────────────────────────────────────────
+
+export interface FighterSignals {
+  // Recent form
+  currentStreak: { type: "W" | "L" | "D"; count: number };
+  recentRecord: { wins: number; losses: number; total: number }; // last 5
+  // Finish / durability
+  knockoutVulnerable: boolean;  // finished by KO in recent fights
+  recentFinishRate: number;     // 0-1 — share of recent wins by finish
+  trajectory: "rising" | "declining" | "volatile" | "unknown";
+  // Style classification
+  styleTag: "Striker" | "Grappler" | "Wrestler" | "Balanced";
+  // Computed differentials
+  strikingDifferential: number;      // SLpM - SApM
+  grapplingAggressionScore: number;  // TDAvg * TDAcc/100 + SubAvg
+  // Layoff / ring rust
+  daysSinceLastFight: number | null;
+  ringRustFlag: boolean;             // >365 days since last fight
+  // Age / career prime
+  estimatedAge: number | null;
+  careerYears: number | null;
+  inPrime: boolean | null;           // true if 25-33, null if unknown
+  // Human-readable summaries for the prompt
+  formSummary: string;
+  styleSummary: string;
+  contextSummary: string;
+}
+
+export interface FightSignals {
+  fighter1: FighterSignals;
+  fighter2: FighterSignals;
+  // Head-to-head edges
+  grapplingEdge: "fighter1" | "fighter2" | "neutral";
+  strikingEdge:  "fighter1" | "fighter2" | "neutral";
+  reachEdge:     "fighter1" | "fighter2" | "neutral" | "unknown";
+  momentumEdge:  "fighter1" | "fighter2" | "neutral";
+  // Single-sentence matchup summary
+  matchupSummary: string;
 }
 
 // ─── Odds types ───────────────────────────────────────────────────────────────

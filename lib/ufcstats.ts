@@ -80,6 +80,23 @@ function parseFighterPage(html: string): Partial<Fighter> {
   const stanceMatch = html.match(/STANCE:<\/i>\s*<span[^>]*>([^<]+)</i);
   if (stanceMatch) stats.stance = stanceMatch[1].trim() as Fighter["stance"];
 
+  // DOB → age
+  const dobMatch = html.match(/DOB:<\/i>\s*<span[^>]*>([^<]+)</i);
+  if (dobMatch) {
+    const dobStr = dobMatch[1].trim();
+    // UFCStats uses "Month. DD, YYYY" or "Month DD, YYYY"
+    const dob = new Date(dobStr);
+    if (!isNaN(dob.getTime())) {
+      const today = new Date();
+      let age = today.getFullYear() - dob.getFullYear();
+      const monthDiff = today.getMonth() - dob.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+        age--;
+      }
+      stats.age = age;
+    }
+  }
+
   // Significant strikes landed per minute
   const slpmMatch = html.match(/SLpM[^>]*>[\s\S]*?<p[^>]*>([\d.]+)/i);
   if (slpmMatch) stats.sigStrikesLandedPerMin = parseFloat(slpmMatch[1]);
@@ -112,8 +129,20 @@ function parseFighterPage(html: string): Partial<Fighter> {
   const subAvgMatch = html.match(/Sub\. Avg[^>]*>[\s\S]*?<p[^>]*>([\d.]+)/i);
   if (subAvgMatch) stats.submissionAvgPer15Min = parseFloat(subAvgMatch[1]);
 
-  // Recent fights from fight history table
-  stats.recentFights = parseRecentFights(html).slice(0, 5);
+  // Recent fights from fight history table (keep up to 5 most recent)
+  const allFights = parseRecentFights(html);
+  stats.recentFights = allFights.slice(0, 5);
+
+  // careerStartDate: oldest fight date from the full history
+  if (allFights.length > 0) {
+    const oldest = allFights[allFights.length - 1];
+    if (oldest.date) {
+      const parsed = new Date(oldest.date);
+      if (!isNaN(parsed.getTime())) {
+        stats.careerStartDate = parsed.toISOString().split("T")[0];
+      }
+    }
+  }
 
   return stats;
 }
