@@ -1,22 +1,39 @@
+/**
+ * POST /api/auth/register
+ *
+ * Invite-code registration only.
+ * Subscription (Stripe) registrations go through /api/stripe/checkout instead.
+ *
+ * Body: { username, email, password, confirmPassword, inviteCode }
+ *
+ * On success:
+ *   - Marks invite code as used
+ *   - Creates user with subscription_status = 'lifetime'
+ *   - Returns { ok: true }
+ */
+
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { sql } from "@/lib/db";
 
 export const runtime = "nodejs";
 
-// ── Validation helpers ────────────────────────────────────────────────────────
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,20}$/;
 const EMAIL_RE    = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(req: NextRequest) {
   let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
+  try { body = await req.json(); } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { username, email, password, confirmPassword } = body as Record<string, string>;
+  const { username, email, password, confirmPassword, inviteCode } =
+    body as Record<string, string>;
+
+  // ── Require invite code ───────────────────────────────────────────────────
+  if (!inviteCode?.trim()) {
+    return NextResponse.json({ error: "An invite code is required" }, { status: 400 });
+  }
 
   // ── Field validation ──────────────────────────────────────────────────────
   if (!username || !email || !password || !confirmPassword) {
@@ -41,7 +58,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Passwords do not match" }, { status: 400 });
   }
 
-  // ── Check uniqueness ──────────────────────────────────────────────────────
+  // ── Validate invite code ──────────────────────────────────────────────────
+  const code = inviteCode.trim().toUpperCase();
+  let codeId: number;
+  try {
+    const rows = await sql`
+      SELECT id, used_by_id FROM invite_codes WHERE code = ${code} LIMIT 1
+    `;
+    if (rows.length === 0) {
+      return NextResponse.json({ error: "Invalid invite code" }, { status: 400 });
+    }
+    if (rows[0].used_by_id) {
+      return NextResponse.json({ error: "Invite code has already been used" }, { status: 400 });
+    }
+    codeId = rows[0].id as number;
+  } catch (err) {
+    console.error("[register] Invite code lookup failed:", err);
+    return NextResponse.json({ error: "Database error" }, { status: 500 });
+  }
+
+  // ── Check username/email uniqueness ───────────────────────────────────────
   try {
     const existing = await sql`
       SELECT id FROM users
@@ -49,27 +85,33 @@ export async function POST(req: NextRequest) {
       LIMIT 1
     `;
     if (existing.length > 0) {
-      return NextResponse.json(
-        { error: "Username or email is already taken" },
-        { status: 409 }
-      );
+      return NextResponse.json({ error: "Username or email already taken" }, { status: 409 });
     }
   } catch (err) {
     console.error("[register] DB lookup failed:", err);
     return NextResponse.json({ error: "Database error" }, { status: 500 });
   }
 
-  // ── Hash + insert ─────────────────────────────────────────────────────────
+  // ── Create user + mark code used (in one logical block) ───────────────────
   try {
     const hash = await bcrypt.hash(password, 12);
-    await sql`
-      INSERT INTO users (username, email, password_hash, role)
+    const newUser = await sql`
+      INSERT INTO users (username, email, password_hash, role, subscription_status)
       VALUES (
         ${username.trim()},
         ${email.trim().toLowerCase()},
         ${hash},
-        'user'
+        'user',
+        'lifetime'
       )
+      RETURNING id
+    `;
+    const userId = newUser[0].id as number;
+
+    await sql`
+      UPDATE invite_codes
+      SET used_by_id = ${userId}, used_at = NOW()
+      WHERE id = ${codeId}
     `;
   } catch (err) {
     console.error("[register] DB insert failed:", err);

@@ -23,7 +23,7 @@ export function Navbar() {
                 className="relative w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center"
                 style={{ background: "linear-gradient(135deg, #D20A0A, #FF2525)" }}
               >
-                <span className="text-white font-black text-[11px] leading-none tracking-tight">UFC</span>
+                <span className="text-white font-black text-xs leading-none tracking-tight">UFC</span>
                 <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
               <span className="text-white font-bold text-sm tracking-widest uppercase">
@@ -39,7 +39,7 @@ export function Navbar() {
                   "px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200",
                   pathname === "/"
                     ? "text-white bg-white/10"
-                    : "text-white/50 hover:text-white hover:bg-white/6"
+                    : "text-white/65 hover:text-white hover:bg-white/6"
                 )}
               >
                 Events
@@ -54,7 +54,7 @@ export function Navbar() {
                 }}
               >
                 <span className="w-1.5 h-1.5 bg-ufc-red rounded-full animate-pulse" />
-                <span className="text-ufc-red text-[11px] font-semibold uppercase tracking-wider">
+                <span className="text-ufc-red text-xs font-semibold uppercase tracking-wider">
                   AI Powered
                 </span>
               </div>
@@ -67,8 +67,8 @@ export function Navbar() {
                   drawerOpen
                     ? "text-white bg-white/10 border-white/15"
                     : pickCount > 0
-                    ? "border-[#D20A0A]/35 bg-[#D20A0A]/8 text-white/80 hover:bg-[#D20A0A]/12"
-                    : "text-white/45 border-white/8 bg-transparent hover:text-white/70 hover:bg-white/6"
+                    ? "border-[#D20A0A]/35 bg-[#D20A0A]/8 text-white/85 hover:bg-[#D20A0A]/12"
+                    : "text-white/60 border-white/8 bg-transparent hover:text-white/80 hover:bg-white/6"
                 )}
                 aria-label="Open prediction slip"
               >
@@ -76,7 +76,7 @@ export function Navbar() {
                 <span className="hidden sm:block">Slip</span>
                 {pickCount > 0 && (
                   <span
-                    className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-black text-white leading-none"
+                    className="w-4 h-4 rounded-full flex items-center justify-center text-xs font-black text-white leading-none"
                     style={{ background: "linear-gradient(135deg, #D20A0A, #FF2525)" }}
                   >
                     {pickCount}

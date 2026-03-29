@@ -54,7 +54,7 @@ export function EventCard({ event, featured = false, index = 0 }: EventCardProps
               <Badge variant="gold" size="sm">PPV</Badge>
             )}
           </div>
-          <span className="text-white/35 text-xs flex-shrink-0 font-medium">
+          <span className="text-white/55 text-xs flex-shrink-0 font-medium">
             {event.status === "live" ? (
               <span className="text-ufc-red font-semibold flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 bg-ufc-red rounded-full animate-pulse inline-block" />
@@ -62,7 +62,7 @@ export function EventCard({ event, featured = false, index = 0 }: EventCardProps
               </span>
             ) : (
               <span className="flex items-center gap-1">
-                <Calendar size={11} className="opacity-60" />
+                <Calendar size={11} className="opacity-70" />
                 {formatShortDate(event.date)}
               </span>
             )}
@@ -80,7 +80,7 @@ export function EventCard({ event, featured = false, index = 0 }: EventCardProps
         </h3>
 
         {/* Location */}
-        <div className="flex items-center gap-1.5 text-white/35 text-xs mb-5">
+        <div className="flex items-center gap-1.5 text-white/55 text-xs mb-5">
           <MapPin size={11} className="flex-shrink-0" />
           <span className="truncate">{event.location}</span>
         </div>
@@ -92,7 +92,7 @@ export function EventCard({ event, featured = false, index = 0 }: EventCardProps
             ? "bg-black/25 border border-ufc-red/15"
             : "bg-black/20 border border-white/5"
         )}>
-          <p className="text-white/35 text-[9px] uppercase tracking-widest mb-2.5 font-semibold">
+          <p className="text-white/50 text-xs uppercase tracking-widest mb-2.5 font-semibold">
             Main Event
           </p>
           <div className="flex items-center gap-2 sm:gap-3">
@@ -105,7 +105,7 @@ export function EventCard({ event, featured = false, index = 0 }: EventCardProps
                   {name.trim()}
                 </span>
                 {i < arr.length - 1 && (
-                  <span className="text-ufc-red font-black text-[10px] uppercase tracking-widest flex-shrink-0 px-1">
+                  <span className="text-ufc-red font-black text-xs uppercase tracking-widest flex-shrink-0 px-1">
                     VS
                   </span>
                 )}

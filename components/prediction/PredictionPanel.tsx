@@ -72,7 +72,7 @@ export function PredictionPanel({ fight, cachedPrediction }: PredictionPanelProp
   if (isPending) {
     return (
       <div className="p-4 sm:p-5">
-        <div className="flex items-center gap-2 text-white/40 text-xs mb-4">
+        <div className="flex items-center gap-2 text-white/60 text-xs mb-4">
           <div className="w-3 h-3 border-2 border-ufc-red/40 border-t-ufc-red rounded-full animate-spin" />
           <span>Analyzing fighter data and generating prediction…</span>
         </div>
@@ -122,7 +122,7 @@ export function PredictionPanel({ fight, cachedPrediction }: PredictionPanelProp
           </span>
         </div>
         {prediction.generatedAt && (
-          <div className="flex items-center gap-1 text-white/35 text-xs">
+          <div className="flex items-center gap-1 text-white/50 text-xs">
             <Clock size={11} />
             <span>{formatShortDate(prediction.generatedAt)}</span>
           </div>
@@ -133,7 +133,7 @@ export function PredictionPanel({ fight, cachedPrediction }: PredictionPanelProp
       <div className="flex items-center gap-5 p-4 bg-black/30 rounded-xl border border-white/5">
         <ConfidenceRing value={prediction.confidence} size={84} />
         <div className="flex-1 min-w-0">
-          <p className="text-white/50 text-xs uppercase tracking-widest mb-1">Predicted Winner</p>
+          <p className="text-white/65 text-xs uppercase tracking-widest mb-1">Predicted Winner</p>
           <p className="text-white font-black text-lg sm:text-xl leading-tight truncate">
             {prediction.winner}
           </p>
@@ -172,7 +172,7 @@ export function PredictionPanel({ fight, cachedPrediction }: PredictionPanelProp
 
             {data.keyAdvantages.length > 0 && (
               <div>
-                <p className="text-xs uppercase tracking-widest text-emerald-500/70 mb-1.5">Advantages</p>
+                <p className="text-xs uppercase tracking-widest text-emerald-400/80 mb-1.5">Advantages</p>
                 <ul className="space-y-1">
                   {data.keyAdvantages.map((adv, i) => (
                     <li key={i} className="text-xs text-white/65 flex gap-1.5">
@@ -186,11 +186,11 @@ export function PredictionPanel({ fight, cachedPrediction }: PredictionPanelProp
 
             {data.keyWeaknesses.length > 0 && (
               <div>
-                <p className="text-xs uppercase tracking-widest text-red-500/60 mb-1.5">Concerns</p>
+                <p className="text-xs uppercase tracking-widest text-red-400/80 mb-1.5">Concerns</p>
                 <ul className="space-y-1">
                   {data.keyWeaknesses.map((w, i) => (
-                    <li key={i} className="text-xs text-white/50 flex gap-1.5">
-                      <span className="text-red-500/50 flex-shrink-0">−</span>
+                    <li key={i} className="text-xs text-white/60 flex gap-1.5">
+                      <span className="text-red-400/70 flex-shrink-0">−</span>
                       <span>{w}</span>
                     </li>
                   ))}
@@ -204,13 +204,13 @@ export function PredictionPanel({ fight, cachedPrediction }: PredictionPanelProp
       {/* Narrative */}
       {prediction.narrative && (
         <div className="p-3 bg-black/20 rounded-lg border border-white/5">
-          <p className="text-xs uppercase tracking-widest text-white/40 mb-2">Analysis</p>
-          <p className="text-white/70 text-sm leading-relaxed">{prediction.narrative}</p>
+          <p className="text-xs uppercase tracking-widest text-white/55 mb-2">Analysis</p>
+          <p className="text-white/75 text-sm leading-relaxed">{prediction.narrative}</p>
         </div>
       )}
 
       {/* Disclaimer */}
-      <p className="text-white/30 text-[11px] text-center">
+      <p className="text-white/45 text-xs text-center">
         AI analysis for entertainment only. Not betting advice.
       </p>
     </div>

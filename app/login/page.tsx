@@ -2,17 +2,22 @@
 
 import { useState, type FormEvent } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff, LogIn, UserPlus, KeyRound } from "lucide-react";
+import { Suspense } from "react";
 
-export default function LoginPage() {
-  const router = useRouter();
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+function LoginForm() {
+  const router       = useRouter();
+  const searchParams = useSearchParams();
+  const registered   = searchParams.get("registered") === "1";
+  const renewed      = searchParams.get("renewed") === "1";
+
+  const [username, setUsername]       = useState("");
+  const [password, setPassword]       = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [error, setError]             = useState<string | null>(null);
+  const [loading, setLoading]         = useState(false);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -62,8 +67,17 @@ export default function LoginPage() {
             <span className="text-white text-xl font-black">U</span>
           </div>
           <h1 className="text-white text-2xl font-black tracking-tight">UFC PREDICTIONS</h1>
-          <p className="text-white/40 text-sm mt-1">AI-powered fight analysis</p>
+          <p className="text-white/55 text-sm mt-1">AI-powered fight analysis</p>
         </div>
+
+        {/* Success banner */}
+        {(registered || renewed) && (
+          <div className="mb-5 rounded-xl px-4 py-3.5 border border-green-500/25 bg-green-500/8">
+            <p className="text-green-400 text-sm font-semibold">
+              {renewed ? "Subscription renewed!" : "Account created!"} Sign in below.
+            </p>
+          </div>
+        )}
 
         {/* Card */}
         <div className="bg-white/[0.04] border border-white/10 rounded-2xl p-8">
@@ -72,7 +86,7 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             {/* Username */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-white/60 text-xs font-medium uppercase tracking-wider">
+              <label className="text-white/65 text-xs font-medium uppercase tracking-wider">
                 Username
               </label>
               <input
@@ -82,13 +96,13 @@ export default function LoginPage() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Enter username"
-                className="bg-white/[0.06] border border-white/10 rounded-lg px-4 py-3 text-white text-sm placeholder:text-white/25 focus:outline-none focus:border-[#D20A0A] focus:bg-white/[0.08] transition-all"
+                className="bg-white/[0.06] border border-white/10 rounded-lg px-4 py-3 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-[#D20A0A] focus:bg-white/[0.08] transition-all"
               />
             </div>
 
             {/* Password */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-white/60 text-xs font-medium uppercase tracking-wider">
+              <label className="text-white/65 text-xs font-medium uppercase tracking-wider">
                 Password
               </label>
               <div className="relative">
@@ -99,12 +113,12 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter password"
-                  className="w-full bg-white/[0.06] border border-white/10 rounded-lg px-4 py-3 pr-11 text-white text-sm placeholder:text-white/25 focus:outline-none focus:border-[#D20A0A] focus:bg-white/[0.08] transition-all"
+                  className="w-full bg-white/[0.06] border border-white/10 rounded-lg px-4 py-3 pr-11 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-[#D20A0A] focus:bg-white/[0.08] transition-all"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70 transition-colors"
                   tabIndex={-1}
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -114,7 +128,7 @@ export default function LoginPage() {
 
             {/* Error message */}
             {error && (
-              <p className="text-[#FF2525] text-sm bg-[#FF2525]/10 border border-[#FF2525]/20 rounded-lg px-4 py-2.5">
+              <p className="text-[#FF4444] text-sm bg-[#FF2525]/10 border border-[#FF2525]/20 rounded-lg px-4 py-2.5">
                 {error}
               </p>
             )}
@@ -125,11 +139,11 @@ export default function LoginPage() {
                 type="button"
                 disabled
                 title="Coming soon"
-                className="flex items-center gap-1.5 text-white/25 text-xs cursor-not-allowed select-none"
+                className="flex items-center gap-1.5 text-white/40 text-xs cursor-not-allowed select-none"
               >
                 <KeyRound size={11} />
                 Forgot password?
-                <span className="text-white/15 text-[10px] ml-1">(coming soon)</span>
+                <span className="text-white/25 text-xs ml-1">(coming soon)</span>
               </button>
             </div>
 
@@ -151,14 +165,14 @@ export default function LoginPage() {
             {/* Divider */}
             <div className="flex items-center gap-3 my-1">
               <div className="flex-1 h-px bg-white/8" />
-              <span className="text-white/20 text-xs">or</span>
+              <span className="text-white/35 text-xs">or</span>
               <div className="flex-1 h-px bg-white/8" />
             </div>
 
             {/* Register */}
             <Link
               href="/register"
-              className="flex items-center justify-center gap-2 w-full py-3 rounded-lg border border-white/10 text-white/60 text-sm font-medium hover:bg-white/[0.06] hover:text-white transition-all"
+              className="flex items-center justify-center gap-2 w-full py-3 rounded-lg border border-white/10 text-white/70 text-sm font-medium hover:bg-white/[0.06] hover:text-white transition-all"
             >
               <UserPlus size={15} />
               Create Account
@@ -166,10 +180,18 @@ export default function LoginPage() {
           </form>
         </div>
 
-        <p className="text-center text-white/15 text-xs mt-6">
+        <p className="text-center text-white/25 text-xs mt-6">
           For entertainment only — not financial or betting advice.
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }

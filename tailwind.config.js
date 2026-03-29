@@ -50,6 +50,20 @@ module.exports = {
         sans: ["var(--font-inter)", "system-ui", "sans-serif"],
         display: ["var(--font-bebas)", "Impact", "sans-serif"],
       },
+      // ── Global font-size bump (+1–2px across the board for WCAG readability) ──
+      fontSize: {
+        "2xs": ["11px", { lineHeight: "16px" }],
+        xs:    ["13px", { lineHeight: "18px" }],
+        sm:    ["15px", { lineHeight: "22px" }],
+        base:  ["17px", { lineHeight: "26px" }],
+        lg:    ["19px", { lineHeight: "28px" }],
+        xl:    ["22px", { lineHeight: "30px" }],
+        "2xl": ["26px", { lineHeight: "34px" }],
+        "3xl": ["30px", { lineHeight: "38px" }],
+        "4xl": ["36px", { lineHeight: "44px" }],
+        "5xl": ["48px", { lineHeight: "1" }],
+        "6xl": ["60px", { lineHeight: "1" }],
+      },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
