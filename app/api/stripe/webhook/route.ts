@@ -58,11 +58,27 @@ export async function POST(req: NextRequest) {
         let subscriptionId: string | null = null;
         let customerId: string | null = null;
 
+        // Customer is available directly on the session
+        customerId = (session.customer as string | null) ?? null;
+
         if (session.subscription) {
           subscriptionId = session.subscription as string;
-          const sub = await stripe.subscriptions.retrieve(subscriptionId);
-          periodEnd = new Date((sub as any).current_period_end * 1000);
-          customerId = sub.customer as string;
+          try {
+            const sub = await stripe.subscriptions.retrieve(subscriptionId);
+            customerId = customerId ?? (sub.customer as string);
+            // current_period_end moved in newer API versions — try multiple paths
+            const ts = (sub as any).current_period_end
+              ?? (sub as any).items?.data?.[0]?.current_period_end;
+            if (ts && !isNaN(Number(ts))) {
+              periodEnd = new Date(Number(ts) * 1000);
+            }
+          } catch (subErr) {
+            console.error("[webhook] Failed to retrieve subscription:", subErr);
+          }
+          // Fallback: 31 days from now
+          if (!periodEnd || isNaN(periodEnd.getTime())) {
+            periodEnd = new Date(Date.now() + 31 * 24 * 60 * 60 * 1000);
+          }
         }
 
         await sql`
@@ -85,7 +101,11 @@ export async function POST(req: NextRequest) {
         if (!subscriptionId) break;
 
         const sub = await stripe.subscriptions.retrieve(subscriptionId);
-        const periodEnd = new Date((sub as any).current_period_end * 1000);
+        const ts = (sub as any).current_period_end
+          ?? (sub as any).items?.data?.[0]?.current_period_end;
+        const periodEnd = (ts && !isNaN(Number(ts)))
+          ? new Date(Number(ts) * 1000)
+          : new Date(Date.now() + 31 * 24 * 60 * 60 * 1000);
 
         await sql`
           UPDATE users SET
