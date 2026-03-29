@@ -77,8 +77,13 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const id = req.nextUrl.searchParams.get("id");
-  if (!id) return NextResponse.json({ error: "id parameter required" }, { status: 400 });
+  const idParam = req.nextUrl.searchParams.get("id");
+  if (!idParam) return NextResponse.json({ error: "id parameter required" }, { status: 400 });
+
+  const id = parseInt(idParam, 10);
+  if (isNaN(id)) {
+    return NextResponse.json({ error: "id must be a valid integer" }, { status: 400 });
+  }
 
   try {
     const result = await sql`

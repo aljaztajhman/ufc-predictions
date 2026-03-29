@@ -2,7 +2,6 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { CheckCircle2, Loader2, ArrowRight, AlertCircle } from "lucide-react";
 

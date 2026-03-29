@@ -13,8 +13,8 @@ export default function NotFound() {
         </div>
       </div>
       <h1 className="text-4xl font-black uppercase text-white mb-2">404</h1>
-      <p className="text-white/40 text-lg mb-1">This fight card doesn&apos;t exist</p>
-      <p className="text-white/25 text-sm mb-8 max-w-xs">
+      <p className="text-white/60 text-lg mb-1">This fight card doesn&apos;t exist</p>
+      <p className="text-white/70 text-sm mb-8 max-w-xs">
         The event or page you&apos;re looking for couldn&apos;t be found.
       </p>
       <Link

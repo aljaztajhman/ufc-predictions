@@ -67,7 +67,7 @@ export function AccumulatorResult({ analysis }: AccumulatorResultProps) {
         {/* Slip Score + badge row */}
         <div className="flex items-start justify-between mb-1">
           <div>
-            <p className="text-xs text-white/65 font-semibold uppercase tracking-widest mb-1">
+            <p className="text-xs text-white/70 font-semibold uppercase tracking-widest mb-1">
               Slip Score
             </p>
             <p
@@ -76,7 +76,7 @@ export function AccumulatorResult({ analysis }: AccumulatorResultProps) {
             >
               {score}%
             </p>
-            <p className="text-xs text-white/55 mt-1.5">
+            <p className="text-xs text-white/60 mt-1.5">
               avg. AI confidence across {analysis.picks.length} pick
               {analysis.picks.length !== 1 ? "s" : ""}
             </p>

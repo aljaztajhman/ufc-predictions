@@ -83,10 +83,10 @@ export function ConfidenceRing({
       </svg>
       {showLabel && (
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-white font-black text-lg leading-none" style={{ color }}>
+          <span className="text-white font-black text-lg leading-none" style={{ color }} aria-label={`${value}% confidence`}>
             {value}%
           </span>
-          <span className="text-white/40 text-[9px] uppercase tracking-wider mt-0.5">
+          <span className="text-white/60 text-xs uppercase tracking-wider mt-0.5">
             {label}
           </span>
         </div>

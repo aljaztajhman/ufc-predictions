@@ -26,7 +26,7 @@ function getStrength(pw: string): { score: number; label: string; color: string 
 
 function Rule({ ok, text }: { ok: boolean; text: string }) {
   return (
-    <li className={`flex items-center gap-1.5 text-xs transition-colors ${ok ? "text-green-400" : "text-white/40"}`}>
+    <li className={`flex items-center gap-1.5 text-xs transition-colors ${ok ? "text-green-400" : "text-white/60"}`}>
       {ok ? <Check size={11} /> : <X size={11} />}
       {text}
     </li>
@@ -65,7 +65,7 @@ function AccountForm({
           value={form.username}
           onChange={(e) => onChange("username", e.target.value)}
           placeholder="3–20 characters"
-          className="bg-white/[0.06] border border-white/10 rounded-lg px-4 py-3 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-[#D20A0A] focus:bg-white/[0.08] transition-all"
+          className="bg-white/[0.06] border border-white/10 rounded-lg px-4 py-3 text-white text-sm placeholder:text-white/50 focus:outline-none focus:border-[#D20A0A] focus:bg-white/[0.08] transition-all"
         />
       </div>
 
@@ -79,7 +79,7 @@ function AccountForm({
           value={form.email}
           onChange={(e) => onChange("email", e.target.value)}
           placeholder="you@example.com"
-          className="bg-white/[0.06] border border-white/10 rounded-lg px-4 py-3 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-[#D20A0A] focus:bg-white/[0.08] transition-all"
+          className="bg-white/[0.06] border border-white/10 rounded-lg px-4 py-3 text-white text-sm placeholder:text-white/50 focus:outline-none focus:border-[#D20A0A] focus:bg-white/[0.08] transition-all"
         />
       </div>
 
@@ -94,7 +94,7 @@ function AccountForm({
             value={form.password}
             onChange={(e) => onChange("password", e.target.value)}
             placeholder="Min. 8 characters"
-            className="w-full bg-white/[0.06] border border-white/10 rounded-lg px-4 py-3 pr-11 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-[#D20A0A] focus:bg-white/[0.08] transition-all"
+            className="w-full bg-white/[0.06] border border-white/10 rounded-lg px-4 py-3 pr-11 text-white text-sm placeholder:text-white/50 focus:outline-none focus:border-[#D20A0A] focus:bg-white/[0.08] transition-all"
           />
           <button
             type="button"
@@ -138,7 +138,7 @@ function AccountForm({
             value={form.confirmPassword}
             onChange={(e) => onChange("confirmPassword", e.target.value)}
             placeholder="Repeat password"
-            className={`w-full bg-white/[0.06] border rounded-lg px-4 py-3 pr-11 text-white text-sm placeholder:text-white/30 focus:outline-none focus:bg-white/[0.08] transition-all ${
+            className={`w-full bg-white/[0.06] border rounded-lg px-4 py-3 pr-11 text-white text-sm placeholder:text-white/50 focus:outline-none focus:bg-white/[0.08] transition-all ${
               form.confirmPassword.length > 0
                 ? pwMatch
                   ? "border-green-500/50 focus:border-green-500"
@@ -264,7 +264,7 @@ export default function RegisterPage() {
             <div className="flex items-center gap-2 mb-1">
               <span className="text-white font-semibold text-base">Subscribe</span>
               <span className="bg-[#D20A0A]/20 text-[#FF4444] text-xs font-semibold px-2 py-0.5 rounded-full border border-[#D20A0A]/30">
-                €20 / month
+                €0.50 / month
               </span>
             </div>
             <p className="text-white/55 text-sm leading-relaxed">
@@ -323,7 +323,7 @@ export default function RegisterPage() {
         </div>
         <div>
           <p className="text-white font-semibold text-sm">Monthly Subscription</p>
-          <p className="text-white/55 text-xs">€20/month — you&apos;ll complete payment on Stripe</p>
+          <p className="text-white/55 text-xs">€0.50/month — you&apos;ll complete payment on Stripe</p>
         </div>
       </div>
 
@@ -386,7 +386,7 @@ export default function RegisterPage() {
           value={inviteCode}
           onChange={(e) => { setInviteCode(e.target.value.toUpperCase()); setError(null); }}
           placeholder="e.g. UFC-A1B2C3"
-          className="bg-amber-500/[0.06] border border-amber-500/20 rounded-lg px-4 py-3 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-amber-400/60 focus:bg-amber-500/[0.09] transition-all font-mono tracking-widest uppercase"
+          className="bg-amber-500/[0.06] border border-amber-500/20 rounded-lg px-4 py-3 text-white text-sm placeholder:text-white/50 focus:outline-none focus:border-amber-400/60 focus:bg-amber-500/[0.09] transition-all font-mono tracking-widest uppercase"
         />
       </div>
 
@@ -445,7 +445,7 @@ export default function RegisterPage() {
             <button
               type="button"
               onClick={() => { setMode("choose"); setError(null); }}
-              className="flex items-center gap-1.5 text-white/50 hover:text-white/80 text-sm mb-5 transition-colors"
+              className="flex items-center gap-1.5 text-white/60 hover:text-white/80 text-sm mb-5 transition-colors"
             >
               <ArrowLeft size={14} />
               Back

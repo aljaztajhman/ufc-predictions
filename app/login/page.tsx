@@ -96,7 +96,7 @@ function LoginForm() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Enter username"
-                className="bg-white/[0.06] border border-white/10 rounded-lg px-4 py-3 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-[#D20A0A] focus:bg-white/[0.08] transition-all"
+                className="bg-white/[0.06] border border-white/10 rounded-lg px-4 py-3 text-white text-sm placeholder:text-white/50 focus:outline-none focus:border-[#D20A0A] focus:bg-white/[0.08] transition-all"
               />
             </div>
 
@@ -113,7 +113,7 @@ function LoginForm() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter password"
-                  className="w-full bg-white/[0.06] border border-white/10 rounded-lg px-4 py-3 pr-11 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-[#D20A0A] focus:bg-white/[0.08] transition-all"
+                  className="w-full bg-white/[0.06] border border-white/10 rounded-lg px-4 py-3 pr-11 text-white text-sm placeholder:text-white/50 focus:outline-none focus:border-[#D20A0A] focus:bg-white/[0.08] transition-all"
                 />
                 <button
                   type="button"
@@ -139,11 +139,11 @@ function LoginForm() {
                 type="button"
                 disabled
                 title="Coming soon"
-                className="flex items-center gap-1.5 text-white/40 text-xs cursor-not-allowed select-none"
+                className="flex items-center gap-1.5 text-white/60 text-xs cursor-not-allowed select-none"
               >
                 <KeyRound size={11} />
                 Forgot password?
-                <span className="text-white/25 text-xs ml-1">(coming soon)</span>
+                <span className="text-white/60 text-xs ml-1">(coming soon)</span>
               </button>
             </div>
 
@@ -165,7 +165,7 @@ function LoginForm() {
             {/* Divider */}
             <div className="flex items-center gap-3 my-1">
               <div className="flex-1 h-px bg-white/8" />
-              <span className="text-white/35 text-xs">or</span>
+              <span className="text-white/60 text-xs">or</span>
               <div className="flex-1 h-px bg-white/8" />
             </div>
 

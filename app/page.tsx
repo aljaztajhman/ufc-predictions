@@ -27,8 +27,8 @@ function EventsGrid({ events }: { events: UFCEvent[] }) {
         <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
           <Calendar size={24} className="text-white/30" />
         </div>
-        <h3 className="text-white/65 text-lg font-semibold mb-2">No upcoming events found</h3>
-        <p className="text-white/45 text-sm">Check back soon for the latest UFC schedule.</p>
+        <h3 className="text-white/60 text-lg font-semibold mb-2">No upcoming events found</h3>
+        <p className="text-white/60 text-sm">Check back soon for the latest UFC schedule.</p>
       </div>
     );
   }
@@ -56,7 +56,7 @@ function EventsGrid({ events }: { events: UFCEvent[] }) {
         <section>
           <div className="flex items-center gap-2 mb-4">
             <div className="h-px flex-1 bg-white/5" />
-            <span className="text-white/50 text-xs uppercase tracking-widest font-semibold px-2">
+            <span className="text-white/60 text-xs uppercase tracking-widest font-semibold px-2">
               Upcoming Events
             </span>
             <div className="h-px flex-1 bg-white/5" />

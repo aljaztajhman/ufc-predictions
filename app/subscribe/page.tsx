@@ -132,10 +132,10 @@ export default function SubscribePage() {
             style={{ background: "linear-gradient(135deg, rgba(210,10,10,0.08), rgba(255,37,37,0.04))" }}
           >
             <div className="flex items-end gap-2 mb-1">
-              <span className="text-white text-4xl font-black">€20</span>
+              <span className="text-white text-4xl font-black">€0.50</span>
               <span className="text-white/55 text-base mb-1.5">/ month</span>
             </div>
-            <p className="text-white/65 text-sm">Full access to everything. Cancel anytime.</p>
+            <p className="text-white/60 text-sm">Full access to everything. Cancel anytime.</p>
           </div>
 
           {/* Features */}
@@ -150,7 +150,7 @@ export default function SubscribePage() {
                 </div>
                 <div>
                   <p className="text-white font-semibold text-sm">{label}</p>
-                  <p className="text-white/50 text-xs mt-0.5">{desc}</p>
+                  <p className="text-white/60 text-xs mt-0.5">{desc}</p>
                 </div>
               </div>
             ))}
@@ -189,7 +189,7 @@ export default function SubscribePage() {
               </p>
             )}
 
-            <p className="text-white/35 text-xs text-center">
+            <p className="text-white/60 text-xs text-center">
               Secure checkout via Stripe. Auto-renews monthly.
             </p>
           </div>

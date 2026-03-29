@@ -111,7 +111,7 @@ export function FightCardItem({
                   {formatRecord(fighter1.record.wins, fighter1.record.losses, fighter1.record.draws)}
                 </span>
                 {fighter1.stance && (
-                  <span className="text-white/45 text-xs uppercase tracking-wider font-medium border border-white/10 px-1.5 py-0.5 rounded-full">
+                  <span className="text-white/60 text-xs uppercase tracking-wider font-medium border border-white/10 px-1.5 py-0.5 rounded-full">
                     {fighter1.stance}
                   </span>
                 )}
@@ -163,7 +163,7 @@ export function FightCardItem({
               </div>
               <div className="flex items-center justify-end gap-2 mr-0.5">
                 {fighter2.stance && (
-                  <span className="text-white/45 text-xs uppercase tracking-wider font-medium border border-white/10 px-1.5 py-0.5 rounded-full">
+                  <span className="text-white/60 text-xs uppercase tracking-wider font-medium border border-white/10 px-1.5 py-0.5 rounded-full">
                     {fighter2.stance}
                   </span>
                 )}
@@ -221,8 +221,8 @@ export function FightCardItem({
               <div className="flex items-center justify-between">
                 <span className="text-white/75 text-sm font-semibold truncate max-w-[40%]">{fighter1.name}</span>
                 <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/5 border border-white/8">
-                  <Swords size={12} className="text-white/55" />
-                  <span className="text-white/55 text-xs uppercase tracking-widest font-semibold">Stats</span>
+                  <Swords size={12} className="text-white/70" />
+                  <span className="text-white/70 text-xs uppercase tracking-widest font-semibold">Stats</span>
                 </div>
                 <span className="text-white/75 text-sm font-semibold text-right truncate max-w-[40%]">{fighter2.name}</span>
               </div>

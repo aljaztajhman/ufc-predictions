@@ -21,11 +21,11 @@ export default function Error({
         <AlertTriangle size={28} className="text-amber-500/60" />
       </div>
       <h2 className="text-2xl font-black uppercase text-white mb-2">Something went wrong</h2>
-      <p className="text-white/40 text-sm mb-1 max-w-sm">
+      <p className="text-white/70 text-sm mb-1 max-w-sm">
         {error.message || "An unexpected error occurred while loading this page."}
       </p>
       {error.digest && (
-        <p className="text-white/20 text-xs mb-6 font-mono">Error ID: {error.digest}</p>
+        <p className="text-white/60 text-xs mb-6 font-mono">Error ID: {error.digest}</p>
       )}
       <div className="flex items-center gap-3 mt-6">
         <button

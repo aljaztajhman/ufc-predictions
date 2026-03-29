@@ -92,7 +92,7 @@ async function EventContent({ eventId }: { eventId: string }) {
           <div className="space-y-3 mb-8">
             <div className="flex items-center gap-2 flex-wrap">
               {timeBadge && <EventTimeBadge label={timeBadge} />}
-              <span className="text-[10px] font-semibold uppercase tracking-widest px-2.5 py-1 rounded-full border border-white/10 text-white/35 bg-white/4">
+              <span className="text-xs font-semibold uppercase tracking-widest px-2.5 py-1 rounded-full border border-white/10 text-white/65 bg-white/4">
                 <Shield size={9} className="inline-block mr-1 align-middle" />
                 {fights.length} Fights
               </span>
@@ -100,7 +100,7 @@ async function EventContent({ eventId }: { eventId: string }) {
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black uppercase tracking-tight text-white leading-tight">
               {data.name}
             </h1>
-            <div className="flex flex-wrap gap-4 text-white/35 text-sm">
+            <div className="flex flex-wrap gap-4 text-white/65 text-sm">
               <span className="flex items-center gap-1.5">
                 <Calendar size={12} />
                 {formatEventDate(data.date)}
@@ -116,7 +116,7 @@ async function EventContent({ eventId }: { eventId: string }) {
           {mainCard[0] && (
             <div className="relative rounded-2xl overflow-hidden border border-ufc-red/20 bg-gradient-to-br from-[#1E0808]/80 via-[#141520]/80 to-[#0D0F18]/80 backdrop-blur-sm p-5 sm:p-6">
               <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-ufc-red/50 to-transparent" />
-              <p className="text-white/30 text-[9px] uppercase tracking-widest mb-4 font-semibold">
+              <p className="text-white/65 text-xs uppercase tracking-widest mb-4 font-semibold">
                 {mainCard[0].isTitleFight ? "🏆 Championship Bout" : "Main Event"}
                 {" · "}{mainCard[0].weightClass}
               </p>
@@ -125,7 +125,7 @@ async function EventContent({ eventId }: { eventId: string }) {
                   <p className="text-white font-black text-2xl sm:text-3xl lg:text-4xl truncate leading-tight">
                     {mainCard[0].fighter1.name}
                   </p>
-                  <p className="text-white/35 text-sm font-mono mt-1">
+                  <p className="text-white/65 text-sm font-mono mt-1">
                     {mainCard[0].fighter1.record.wins}-{mainCard[0].fighter1.record.losses}-{mainCard[0].fighter1.record.draws}
                   </p>
                 </div>
@@ -137,7 +137,7 @@ async function EventContent({ eventId }: { eventId: string }) {
                   <p className="text-white font-black text-2xl sm:text-3xl lg:text-4xl truncate leading-tight">
                     {mainCard[0].fighter2.name}
                   </p>
-                  <p className="text-white/35 text-sm font-mono mt-1">
+                  <p className="text-white/65 text-sm font-mono mt-1">
                     {mainCard[0].fighter2.record.wins}-{mainCard[0].fighter2.record.losses}-{mainCard[0].fighter2.record.draws}
                   </p>
                 </div>
@@ -155,7 +155,7 @@ async function EventContent({ eventId }: { eventId: string }) {
               <span className="text-2xl">🥊</span>
             </div>
             <p className="text-white/60 text-base font-semibold">Fight card not yet announced</p>
-            <p className="text-white/30 text-sm mt-1">Check back closer to the event date.</p>
+            <p className="text-white/60 text-sm mt-1">Check back closer to the event date.</p>
           </div>
         ) : (
           <>

@@ -14,7 +14,7 @@ export default function EventError({
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
       <Link
         href="/"
-        className="inline-flex items-center gap-2 text-white/40 hover:text-white text-sm mb-10 transition-colors group"
+        className="inline-flex items-center gap-2 text-white/60 hover:text-white text-sm mb-10 transition-colors group"
       >
         <ArrowLeft size={14} className="group-hover:-translate-x-0.5 transition-transform" />
         All Events
@@ -24,7 +24,7 @@ export default function EventError({
         <AlertTriangle size={24} className="text-amber-500/60" />
       </div>
       <h2 className="text-xl font-black uppercase text-white mb-2">Failed to load event</h2>
-      <p className="text-white/35 text-sm mb-6 max-w-xs mx-auto">
+      <p className="text-white/60 text-sm mb-6 max-w-xs mx-auto">
         {error.message || "Could not load fight card data. Please try again."}
       </p>
       <button

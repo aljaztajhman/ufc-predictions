@@ -58,24 +58,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Passwords do not match" }, { status: 400 });
   }
 
-  // ── Validate invite code ──────────────────────────────────────────────────
+  // ── Validate invite code (atomic update check) ───────────────────────────
   const code = inviteCode.trim().toUpperCase();
-  let codeId: number;
-  try {
-    const rows = await sql`
-      SELECT id, used_by_id FROM invite_codes WHERE code = ${code} LIMIT 1
-    `;
-    if (rows.length === 0) {
-      return NextResponse.json({ error: "Invalid invite code" }, { status: 400 });
-    }
-    if (rows[0].used_by_id) {
-      return NextResponse.json({ error: "Invite code has already been used" }, { status: 400 });
-    }
-    codeId = rows[0].id as number;
-  } catch (err) {
-    console.error("[register] Invite code lookup failed:", err);
-    return NextResponse.json({ error: "Database error" }, { status: 500 });
-  }
 
   // ── Check username/email uniqueness ───────────────────────────────────────
   try {
@@ -92,7 +76,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Database error" }, { status: 500 });
   }
 
-  // ── Create user + mark code used (in one logical block) ───────────────────
+  // ── Create user ──────────────────────────────────────────────────────────
+  let userId: number;
   try {
     const hash = await bcrypt.hash(password, 12);
     const newUser = await sql`
@@ -106,16 +91,29 @@ export async function POST(req: NextRequest) {
       )
       RETURNING id
     `;
-    const userId = newUser[0].id as number;
-
-    await sql`
-      UPDATE invite_codes
-      SET used_by_id = ${userId}, used_at = NOW()
-      WHERE id = ${codeId}
-    `;
+    userId = newUser[0].id as number;
   } catch (err) {
     console.error("[register] DB insert failed:", err);
     return NextResponse.json({ error: "Failed to create account" }, { status: 500 });
+  }
+
+  // ── Mark invite code used (atomic check + update) ──────────────────────────
+  try {
+    const result = await sql`
+      UPDATE invite_codes SET used_by_id = ${userId}, used_at = NOW()
+      WHERE code = ${code} AND used_by_id IS NULL
+      RETURNING id
+    `;
+    if (result.length === 0) {
+      // Rollback user creation if code was invalid or already used
+      await sql`DELETE FROM users WHERE id = ${userId}`.catch(() => {});
+      return NextResponse.json({ error: "Invalid or already-used invite code" }, { status: 400 });
+    }
+  } catch (err) {
+    console.error("[register] Invite code update failed:", err);
+    // Rollback user creation on error
+    await sql`DELETE FROM users WHERE id = ${userId}`.catch(() => {});
+    return NextResponse.json({ error: "Database error" }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true }, { status: 201 });

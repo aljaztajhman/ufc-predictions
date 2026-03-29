@@ -13,7 +13,7 @@ export function Badge({ children, variant = "gray", size = "sm", className, puls
     <span
       className={cn(
         "inline-flex items-center gap-1.5 font-semibold uppercase tracking-wider rounded-full",
-        size === "sm" ? "text-[10px] px-2 py-0.5" : "text-xs px-3 py-1",
+        size === "sm" ? "text-xs px-2 py-0.5" : "text-xs px-3 py-1",
         variant === "red" && "bg-ufc-red/15 text-ufc-red border border-ufc-red/30",
         variant === "gold" && "bg-amber-500/15 text-amber-400 border border-amber-500/30",
         variant === "green" && "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30",
