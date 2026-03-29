@@ -115,4 +115,9 @@ module.exports = {
         "card": "0 2px 16px rgba(0,0,0,0.4), 0 1px 4px rgba(0,0,0,0.3)",
         "card-hover": "0 8px 32px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.4)",
         "red-glow": "0 0 24px rgba(210,10,10,0.3), 0 0 8px rgba(210,10,10,0.2)",
-        "red-glow-lg": "0 0 40px rgba(
+        "red-glow-lg": "0 0 40px rgba(210,10,10,0.35), 0 0 16px rgba(210,10,10,0.2)",
+      },
+    },
+  },
+  plugins: [require("tailwindcss-animate")],
+};
