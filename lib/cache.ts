@@ -165,6 +165,41 @@ export async function invalidateEvents(): Promise<void> {
   memCache.delete(KV_KEYS.upcomingEvents());
 }
 
+/**
+ * Delete ALL cached predictions (v1 + v2) from Redis and the in-memory map.
+ * Used by the admin cache-clear endpoint to force fresh predictions.
+ * Returns the number of keys deleted.
+ */
+export async function clearPredictionCache(): Promise<number> {
+  let deleted = 0;
+
+  // 1. Clear in-memory entries matching either prediction key pattern
+  for (const key of memCache.keys()) {
+    if (key.startsWith("ufc:prediction:")) {
+      memCache.delete(key);
+      deleted++;
+    }
+  }
+
+  // 2. Clear Redis if configured
+  const redis = getRedis();
+  if (redis) {
+    try {
+      // Upstash supports keys() for admin-style operations
+      const v1Keys = await redis.keys("ufc:prediction:*");
+      // v2 keys are a subset of the above pattern so one scan is enough
+      if (v1Keys.length > 0) {
+        await redis.del(...(v1Keys as [string, ...string[]]));
+        deleted += v1Keys.length;
+      }
+    } catch {
+      // Redis unavailable — in-memory clear was still done
+    }
+  }
+
+  return deleted;
+}
+
 export function isRedisConfigured(): boolean {
   return getRedis() !== null;
 }
