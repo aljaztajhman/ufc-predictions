@@ -24,7 +24,7 @@ import { auth } from "@/lib/auth";
 export const runtime = "nodejs";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-01-27.acacia",
+  apiVersion: "2026-03-25.dahlia",
 });
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,20}$/;
