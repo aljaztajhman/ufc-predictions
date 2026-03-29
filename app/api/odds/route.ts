@@ -11,7 +11,7 @@ import { NextResponse } from "next/server";
 import { fetchAllMMAOdds } from "@/lib/odds";
 
 export const runtime = "nodejs";
-// No edge runtime — Redis + fetch need Node.js
+export const dynamic = "force-dynamic"; // odds are always live — never statically rendered
 
 export async function GET() {
   if (!process.env.ODDS_API_KEY) {

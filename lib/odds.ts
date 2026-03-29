@@ -83,8 +83,9 @@ export async function fetchAllMMAOdds(): Promise<OddsAPIEvent[]> {
       `?apiKey=${apiKey}&regions=us,eu&markets=h2h&oddsFormat=decimal`;
 
     const res = await fetch(url, {
-      // No next.js ISR cache here — we handle caching ourselves via Redis
-      cache: "no-store",
+      // Use short revalidation rather than no-store to avoid Next.js static-render errors.
+      // Actual caching is handled by Redis above — this is just a fallback hint.
+      next: { revalidate: 3600 },
     });
 
     if (!res.ok) {
