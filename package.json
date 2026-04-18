@@ -13,6 +13,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.27.3",
     "@neondatabase/serverless": "^0.10.4",
+    "@upstash/ratelimit": "^2.0.5",
     "@upstash/redis": "^1.34.3",
     "bcryptjs": "^2.4.3",
     "clsx": "^2.1.1",

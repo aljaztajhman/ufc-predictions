@@ -158,8 +158,11 @@ Respond ONLY with a JSON object (no markdown code blocks) matching this exact sc
 // ─── Main prediction function ─────────────────────────────────────────────────
 
 export async function generatePrediction(fight: Fight): Promise<PredictionResult> {
-  // 1. Check cache first — v2 then v1 fallback (transparent in getCachedPrediction)
-  const cached = await getCachedPrediction(fight.id);
+  // 1. Check cache first — v3 (matchup-scoped) first, then v2/v1 legacy fallback.
+  // Passing the fighter IDs means a fighter swap on the same slot (common when
+  // ESPN keeps matchNumber stable through an injury replacement) naturally
+  // misses cache and regenerates against the new matchup.
+  const cached = await getCachedPrediction(fight.id, fight.fighter1.id, fight.fighter2.id);
   if (cached) return cached;
 
   // 2. Enrich fighters + fetch odds in parallel
@@ -237,7 +240,8 @@ export async function generatePrediction(fight: Fight): Promise<PredictionResult
   };
 
   // 8. Cache (writes to v2 key automatically)
-  await setCachedPrediction(fight.id, prediction);
+  // Write to v3 (matchup-scoped) key so future fighter swaps naturally invalidate.
+  await setCachedPrediction(fight.id, prediction, fight.fighter1.id, fight.fighter2.id);
 
   return prediction;
 }

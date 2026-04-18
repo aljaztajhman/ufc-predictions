@@ -19,6 +19,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { generatePrediction } from "@/lib/claude";
+import { auth } from "@/lib/auth";
+import { checkAccumulatorRateLimit, getClientIp, rateLimitResponse } from "@/lib/ratelimit";
 import type { Fight, SlipPick, AccumulatorAnalysis } from "@/types";
 
 export const runtime = "nodejs";
@@ -68,6 +70,17 @@ export async function POST(req: NextRequest) {
       { error: "ANTHROPIC_API_KEY is not configured" },
       { status: 503 }
     );
+  }
+
+  // Rate limit — accumulator is more expensive than a single prediction
+  // (N cached/fresh predictions + 1 narrative call), so the budget is
+  // tighter: 10/day/user + 60/hr/IP.
+  const session = await auth();
+  const userId = session?.user?.id;
+  const ip = getClientIp(req.headers);
+  const rl = await checkAccumulatorRateLimit(userId, ip);
+  if (!rl.success) {
+    return rateLimitResponse(rl) as unknown as NextResponse;
   }
 
   let picks: SlipPick[];

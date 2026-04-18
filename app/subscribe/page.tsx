@@ -17,7 +17,7 @@ const FEATURES = [
 ];
 
 export default function SubscribePage() {
-  const { data: session, status } = useSession();
+  const { data: session, status, update } = useSession();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState<string | null>(null);
@@ -34,6 +34,36 @@ export default function SubscribePage() {
       router.replace("/");
     }
   }, [status, hasAccess, router]);
+
+  // Registration → payment → active race fix. When the JWT still says
+  // "pending" but the Stripe webhook may already have fired, poll the
+  // session every 2s (up to 30s) to force a JWT refresh via the server-side
+  // jwt callback's `trigger === "update"` branch. As soon as the DB row is
+  // 'active', the next poll flips `hasAccess` true and the effect above
+  // pushes the user home. Avoids asking them to log out / log in.
+  useEffect(() => {
+    if (status !== "authenticated" || !isPending) return;
+    let cancelled = false;
+    let attempts = 0;
+    const maxAttempts = 15; // 15 × 2s = 30s
+
+    const tick = async () => {
+      if (cancelled) return;
+      attempts++;
+      try {
+        await update(); // triggers jwt callback with trigger==='update'
+      } catch {
+        // ignore — we'll just try again next tick
+      }
+      if (attempts < maxAttempts && !cancelled) {
+        setTimeout(tick, 2000);
+      }
+    };
+
+    // First poll after 1.5s to give the webhook a head-start
+    const initial = setTimeout(tick, 1500);
+    return () => { cancelled = true; clearTimeout(initial); };
+  }, [status, isPending, update]);
 
   async function handleSubscribe() {
     if (status !== "authenticated") {

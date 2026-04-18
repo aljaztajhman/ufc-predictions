@@ -81,19 +81,31 @@ async function kvDel(key: string): Promise<void> {
 }
 
 // ─── TTLs ─────────────────────────────────────────────────────────────────────
+// EVENTS/FIGHTS dropped from 6h → 3h: pairs with the cron moving from 1×/day
+// to 4×/day (every 6h), so any matchup change is reflected in the UI within
+// a max of ~3h whether cron runs or a user triggers the revalidate-on-miss.
 export const TTL = {
-  EVENTS:     60 * 60 * 6,        // 6 hours  — upcoming event list
-  FIGHTS:     60 * 60 * 6,        // 6 hours  — fight card per event
-  PREDICTION: 60 * 60 * 24 * 30,  // 30 days  — AI predictions (semi-permanent)
+  EVENTS:     60 * 60 * 3,        // 3 hours  — upcoming event list
+  FIGHTS:     60 * 60 * 3,        // 3 hours  — fight card per event
+  PREDICTION: 60 * 60 * 24 * 30,  // 30 days  — AI predictions (matchup-scoped, see KV_KEYS.predictionV3)
 } as const;
 
 // ─── Key builders ─────────────────────────────────────────────────────────────
+//
+// Prediction keys are versioned so we can invalidate en-masse without touching
+// other caches. Important: v3 bakes fighter identity into the key so that if
+// ESPN swaps a fighter in the same slot (common — they keep matchNumber stable
+// across injury replacements), we naturally miss the cache and re-generate
+// against the new matchup. Pre-v3 behaviour would serve the OLD fighter's
+// prediction for the NEW fight until the 30-day TTL expired.
 export const KV_KEYS = {
   upcomingEvents:   ()                => "ufc:events:upcoming",
   eventData:        (id: string)      => `ufc:event:${id}`,        // full EventWithFights
   eventFights:      (id: string)      => `ufc:event:${id}:fights`, // legacy compat
   prediction:       (fightId: string) => `ufc:prediction:${fightId}`,     // v1 (legacy read)
-  predictionV2:     (fightId: string) => `ufc:prediction:v2:${fightId}`,  // v2 (current write)
+  predictionV2:     (fightId: string) => `ufc:prediction:v2:${fightId}`,  // v2 (legacy read)
+  predictionV3:     (fightId: string, f1Id: string, f2Id: string) =>
+    `ufc:prediction:v3:${fightId}:${f1Id}:${f2Id}`,                         // v3 (current write)
 } as const;
 
 // ─── Typed public API ─────────────────────────────────────────────────────────
@@ -133,8 +145,30 @@ export async function setCachedFights(eventId: string, fights: Fight[]): Promise
   memSet(key, fights, TTL.FIGHTS);
 }
 
-export async function getCachedPrediction(fightId: string): Promise<PredictionResult | null> {
-  // Try v2 key first; fall back to legacy v1 for predictions cached before the upgrade
+/**
+ * Read a cached prediction.
+ *
+ * Fighter IDs are optional for backwards compatibility. If provided, we
+ * prefer the v3 key (matchup-scoped) — this is the path that avoids
+ * serving a stale prediction after a fighter swap. If absent, or if v3
+ * misses, we fall back to v2 then v1 for legacy entries written before
+ * the migration. Callers that have Fighter objects available (predictions
+ * generator, event page server component) SHOULD pass the IDs.
+ */
+export async function getCachedPrediction(
+  fightId: string,
+  f1Id?: string,
+  f2Id?: string,
+): Promise<PredictionResult | null> {
+  // v3: matchup-scoped — only hit if fighter IDs are provided
+  if (f1Id && f2Id) {
+    const v3Key = KV_KEYS.predictionV3(fightId, f1Id, f2Id);
+    const v3 = (await kvGet<PredictionResult>(v3Key)) ?? memGet<PredictionResult>(v3Key);
+    if (v3) return v3;
+  }
+
+  // v2 / v1: legacy reads — may return the wrong prediction after a fighter
+  // swap (that's the bug v3 fixes), but for unchanged matchups these are fine.
   const v2Key = KV_KEYS.predictionV2(fightId);
   const v2 = (await kvGet<PredictionResult>(v2Key)) ?? memGet<PredictionResult>(v2Key);
   if (v2) return v2;
@@ -143,9 +177,20 @@ export async function getCachedPrediction(fightId: string): Promise<PredictionRe
   return (await kvGet<PredictionResult>(v1Key)) ?? memGet<PredictionResult>(v1Key);
 }
 
-export async function setCachedPrediction(fightId: string, prediction: PredictionResult): Promise<void> {
-  // Always write to v2 only — no need to dual-write v1
-  const key = KV_KEYS.predictionV2(fightId);
+/**
+ * Write a prediction. Always writes to the v3 (matchup-scoped) key.
+ * If callers don't pass fighter IDs we fall back to v2 to avoid a silent
+ * write-loss, but that path should be considered deprecated.
+ */
+export async function setCachedPrediction(
+  fightId: string,
+  prediction: PredictionResult,
+  f1Id?: string,
+  f2Id?: string,
+): Promise<void> {
+  const key = (f1Id && f2Id)
+    ? KV_KEYS.predictionV3(fightId, f1Id, f2Id)
+    : KV_KEYS.predictionV2(fightId);
   await kvSet(key, prediction, TTL.PREDICTION);
   memSet(key, prediction, TTL.PREDICTION);
 }

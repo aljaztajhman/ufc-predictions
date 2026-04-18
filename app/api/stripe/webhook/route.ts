@@ -118,17 +118,43 @@ export async function POST(req: NextRequest) {
       }
 
       // ── Subscription cancelled or expired ────────────────────────────────
+      //
+      // Grace period: when a user cancels (or Stripe auto-cancels after
+      // repeated payment failures), they've typically already paid through
+      // the end of the current period. We preserve access until that date
+      // instead of revoking immediately — both more correct (they paid for
+      // it) and lower-churn (people often reactivate before expiry). If
+      // Stripe's period_end isn't present for any reason we fall back to
+      // NOW() so we fail closed rather than granting indefinite access.
       case "customer.subscription.deleted": {
         const sub = event.data.object as Stripe.Subscription;
         const subscriptionId = sub.id;
 
+        const ts = (sub as any).current_period_end
+          ?? (sub as any).items?.data?.[0]?.current_period_end
+          ?? (sub as any).cancel_at
+          ?? (sub as any).canceled_at;
+        const expiresAt = (ts && !isNaN(Number(ts)))
+          ? new Date(Number(ts) * 1000)
+          : new Date(); // fall back to NOW() — fail closed
+
+        // Status: if the grace period is still in the future, keep the row
+        // marked 'active' so middleware continues allowing access. Flip to
+        // 'cancelled' only when the period has actually elapsed (the nightly
+        // cron or a subsequent event will handle late flips if needed).
+        const stillWithinPeriod = expiresAt.getTime() > Date.now();
+        const newStatus = stillWithinPeriod ? 'active' : 'cancelled';
+
         await sql`
           UPDATE users SET
-            subscription_status     = 'cancelled',
-            subscription_expires_at = NOW()
+            subscription_status     = ${newStatus},
+            subscription_expires_at = ${expiresAt.toISOString()}
           WHERE stripe_subscription_id = ${subscriptionId}
         `;
-        console.log(`[webhook] Subscription ${subscriptionId} cancelled`);
+        console.log(
+          `[webhook] Subscription ${subscriptionId} cancelled — ` +
+          `access retained until ${expiresAt.toISOString()} (status=${newStatus})`
+        );
         break;
       }
 

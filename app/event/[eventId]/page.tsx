@@ -55,7 +55,9 @@ async function EventContent({ eventId }: { eventId: string }) {
   // Load cached predictions server-side
   const allFights = [...mainCard, ...prelims, ...earlyPrelims];
   const predictionEntries = await Promise.all(
-    allFights.map(async (f) => [f.id, await getCachedPrediction(f.id)] as [string, PredictionResult | null])
+    allFights.map(async (f) =>
+      [f.id, await getCachedPrediction(f.id, f.fighter1.id, f.fighter2.id)] as [string, PredictionResult | null]
+    )
   );
   const predictions = Object.fromEntries(predictionEntries);
 

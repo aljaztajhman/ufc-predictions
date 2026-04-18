@@ -1,13 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generatePrediction } from "@/lib/claude";
 import { getCachedPrediction } from "@/lib/cache";
+import { auth } from "@/lib/auth";
+import { checkPredictionRateLimit, getClientIp, rateLimitResponse } from "@/lib/ratelimit";
 import type { Fight } from "@/types";
 
+// GET supports optional ?f1=<id>&f2=<id> so callers that know the matchup can
+// hit the matchup-scoped v3 cache directly (avoids serving a stale v2 entry
+// after a fighter swap). Without the params we fall back to the legacy lookup.
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { fightId: string } }
 ) {
-  const cached = await getCachedPrediction(params.fightId);
+  const { searchParams } = new URL(req.url);
+  const f1 = searchParams.get("f1") ?? undefined;
+  const f2 = searchParams.get("f2") ?? undefined;
+
+  const cached = await getCachedPrediction(params.fightId, f1, f2);
   if (!cached) {
     return NextResponse.json({ error: "Prediction not found" }, { status: 404 });
   }
@@ -19,12 +28,9 @@ export async function POST(
   { params }: { params: { fightId: string } }
 ) {
   try {
-    // Always check cache first — never re-generate
-    const cached = await getCachedPrediction(params.fightId);
-    if (cached) {
-      return NextResponse.json(cached);
-    }
-
+    // Parse body FIRST — we need fighter IDs to do a matchup-scoped cache
+    // lookup. Doing the cache check with just fightId (as this code used to)
+    // could serve a stale prediction from before a fighter swap.
     const body = await req.json();
     const fight: Fight = body.fight;
 
@@ -35,11 +41,33 @@ export async function POST(
       );
     }
 
+    // Matchup-scoped cache check — falls back to v2/v1 for entries written
+    // before v3 if the current fighter pair isn't found.
+    const cached = await getCachedPrediction(
+      params.fightId,
+      fight.fighter1.id,
+      fight.fighter2.id,
+    );
+    if (cached) {
+      return NextResponse.json(cached);
+    }
+
     if (!process.env.ANTHROPIC_API_KEY) {
       return NextResponse.json(
         { error: "ANTHROPIC_API_KEY is not configured" },
         { status: 503 }
       );
+    }
+
+    // Rate limit applies ONLY to the expensive path (cache miss → Claude call).
+    // Cached reads above don't count — a user refreshing an already-seen
+    // event shouldn't burn budget. Per-user 30/day + per-IP 200/hr.
+    const session = await auth();
+    const userId = session?.user?.id;
+    const ip = getClientIp(req.headers);
+    const rl = await checkPredictionRateLimit(userId, ip);
+    if (!rl.success) {
+      return rateLimitResponse(rl) as unknown as NextResponse;
     }
 
     const prediction = await generatePrediction(fight);
