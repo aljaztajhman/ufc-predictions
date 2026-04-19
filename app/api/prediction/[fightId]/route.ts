@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generatePrediction } from "@/lib/claude";
 import { getCachedPrediction } from "@/lib/cache";
-import { readStoredPrediction } from "@/lib/predictions";
+import { readStoredPrediction, recordPredictionView, MODEL_VERSION } from "@/lib/predictions";
 import { auth } from "@/lib/auth";
 import { checkPredictionRateLimit, getClientIp, rateLimitResponse } from "@/lib/ratelimit";
 import type { Fight } from "@/types";
 
 // GET supports optional ?f1=<id>&f2=<id> so callers that know the matchup can
-// hit the matchup-scoped v3 cache directly (avoids serving a stale v2 entry
-// after a fighter swap). Without the params we fall back to the legacy lookup.
+// hit the matchup-scoped v4 cache directly (avoids serving a stale legacy
+// entry after a fighter swap or model bump). Without the params we still fall
+// back through v3 → v2 → v1 inside getCachedPrediction.
 export async function GET(
   req: NextRequest,
   { params }: { params: { fightId: string } }
@@ -17,7 +18,8 @@ export async function GET(
   const f1 = searchParams.get("f1") ?? undefined;
   const f2 = searchParams.get("f2") ?? undefined;
 
-  const cached = await getCachedPrediction(params.fightId, f1, f2);
+  // Always pass MODEL_VERSION so v4 is preferred when fighter IDs are known.
+  const cached = await getCachedPrediction(params.fightId, f1, f2, MODEL_VERSION);
   if (!cached) {
     return NextResponse.json({ error: "Prediction not found" }, { status: 404 });
   }
@@ -42,12 +44,21 @@ export async function POST(
       );
     }
 
+    // Resolve the session up front so we can record the view on BOTH the
+    // cached and the fresh path. (Rate-limit check still only applies to the
+    // fresh-generate branch below.)
+    const session = await auth();
+    const userId = session?.user?.id;
+
     // Unified read chain: KV (fast) → Postgres (authoritative) → miss.
     // Postgres hits skip the rate limit AND skip Claude entirely — another
     // user has already generated this prediction, so it costs us nothing to
     // serve it again.
     const stored = await readStoredPrediction(fight);
     if (stored) {
+      // Record view for the user's /my-predictions history. Fire-and-forget;
+      // never block the response on a history-write failure.
+      recordPredictionView(fight, userId).catch(() => { /* logged inside */ });
       return NextResponse.json(stored);
     }
 
@@ -61,8 +72,6 @@ export async function POST(
     // Rate limit applies ONLY to the expensive path (cache miss → Claude call).
     // Cached reads above don't count — a user refreshing an already-seen
     // event shouldn't burn budget. Per-user 30/day + per-IP 200/hr.
-    const session = await auth();
-    const userId = session?.user?.id;
     const ip = getClientIp(req.headers);
     const rl = await checkPredictionRateLimit(userId, ip);
     if (!rl.success) {
@@ -70,6 +79,9 @@ export async function POST(
     }
 
     const prediction = await generatePrediction(fight);
+    // Record the view on the fresh-generate path too — the user just caused
+    // this prediction to exist, so it definitely belongs in their history.
+    recordPredictionView(fight, userId).catch(() => { /* logged inside */ });
     return NextResponse.json(prediction);
   } catch (err) {
     console.error("Prediction API error:", err);
