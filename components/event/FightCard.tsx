@@ -311,7 +311,12 @@ export function FightCardItem({
 
             {/* AI Prediction */}
             <div className="border-t border-white/5">
-              <PredictionPanel fight={fight} cachedPrediction={cachedPrediction} />
+              <PredictionPanel
+                fight={fight}
+                eventName={eventName}
+                eventDate={eventDate}
+                cachedPrediction={cachedPrediction}
+              />
             </div>
           </div>
         )}

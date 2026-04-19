@@ -171,6 +171,16 @@ async function persistPredictionRow(
 // ─── View tracking (feeds /my-predictions history tab) ───────────────────────
 
 /**
+ * Event-level context captured at view time and denormalized into the view
+ * row. Keeps the /my-predictions page self-sufficient (no ESPN/KV re-fetch
+ * when rendering a user's history).
+ */
+export interface ViewEventContext {
+  eventName?: string;
+  eventDate?: string; // ISO string; optional in case caller doesn't have it
+}
+
+/**
  * Record that a user has viewed a prediction. Upserts a row in
  * user_prediction_views, incrementing view_count on repeat views and
  * updating last_viewed_at. Fire-and-forget from the caller's perspective —
@@ -179,10 +189,14 @@ async function persistPredictionRow(
  * userId can be null/undefined for anonymous views; we currently skip those
  * because we have nothing to key them on, but the schema admits NULL user_id
  * so global/anonymous tracking can be added later without migration.
+ *
+ * `eventCtx` carries event name/date so the /my-predictions page can render
+ * readable rows without re-fetching. Safe to omit — columns are nullable.
  */
 export async function recordPredictionView(
   fight: Fight,
   userId: string | null | undefined,
+  eventCtx?: ViewEventContext,
 ): Promise<void> {
   if (!userId) return; // Anonymous views: skip for now.
 
@@ -190,7 +204,9 @@ export async function recordPredictionView(
     await sql`
       INSERT INTO user_prediction_views
         (user_id, fight_id, fighter1_id, fighter2_id, event_id, model_version,
-         first_viewed_at, last_viewed_at, view_count)
+         first_viewed_at, last_viewed_at, view_count,
+         fighter1_name, fighter2_name, weight_class,
+         event_name, event_date, is_title_fight, is_main_event)
       VALUES
         (
           ${userId},
@@ -201,12 +217,29 @@ export async function recordPredictionView(
           ${MODEL_VERSION},
           NOW(),
           NOW(),
-          1
+          1,
+          ${fight.fighter1.name},
+          ${fight.fighter2.name},
+          ${fight.weightClass},
+          ${eventCtx?.eventName ?? null},
+          ${eventCtx?.eventDate ?? null},
+          ${fight.isTitleFight},
+          ${fight.isMainEvent}
         )
       ON CONFLICT (user_id, fight_id, fighter1_id, fighter2_id, model_version)
       DO UPDATE SET
         last_viewed_at = NOW(),
-        view_count     = user_prediction_views.view_count + 1
+        view_count     = user_prediction_views.view_count + 1,
+        -- Refresh the display snapshot on repeat views in case event metadata
+        -- changed (renamed event, rescheduled date, etc.). Cheap and keeps
+        -- history looking correct without a cron backfill.
+        fighter1_name  = EXCLUDED.fighter1_name,
+        fighter2_name  = EXCLUDED.fighter2_name,
+        weight_class   = EXCLUDED.weight_class,
+        event_name     = COALESCE(EXCLUDED.event_name,  user_prediction_views.event_name),
+        event_date     = COALESCE(EXCLUDED.event_date,  user_prediction_views.event_date),
+        is_title_fight = EXCLUDED.is_title_fight,
+        is_main_event  = EXCLUDED.is_main_event
     `;
   } catch (err) {
     // Non-fatal: history tracking is nice-to-have, never block a prediction
@@ -221,7 +254,14 @@ export interface UserPredictionViewRow {
   fightId: string;
   fighter1Id: string;
   fighter2Id: string;
+  fighter1Name: string | null;
+  fighter2Name: string | null;
+  weightClass: string | null;
   eventId: string | null;
+  eventName: string | null;
+  eventDate: string | null;
+  isTitleFight: boolean;
+  isMainEvent: boolean;
   modelVersion: string;
   firstViewedAt: string;
   lastViewedAt: string;
@@ -234,7 +274,9 @@ export interface UserPredictionViewRow {
 
 /**
  * Per-user history: the user's most-recently viewed predictions, newest first,
- * joined with the prediction payload from the `predictions` table.
+ * joined with the prediction payload from the `predictions` table. Denormalized
+ * display columns (fighter names, event name/date, weight class) come straight
+ * from the view row — no ESPN/KV re-fetch required.
  */
 export async function listUserPredictionViews(
   userId: string,
@@ -246,7 +288,14 @@ export async function listUserPredictionViews(
       v.fight_id,
       v.fighter1_id,
       v.fighter2_id,
+      v.fighter1_name,
+      v.fighter2_name,
+      v.weight_class,
       v.event_id,
+      v.event_name,
+      v.event_date,
+      v.is_title_fight,
+      v.is_main_event,
       v.model_version,
       v.first_viewed_at,
       v.last_viewed_at,
@@ -267,7 +316,14 @@ export async function listUserPredictionViews(
     fightId:       r.fight_id as string,
     fighter1Id:    r.fighter1_id as string,
     fighter2Id:    r.fighter2_id as string,
+    fighter1Name:  (r.fighter1_name as string) ?? null,
+    fighter2Name:  (r.fighter2_name as string) ?? null,
+    weightClass:   (r.weight_class as string) ?? null,
     eventId:       (r.event_id as string) ?? null,
+    eventName:     (r.event_name as string) ?? null,
+    eventDate:     r.event_date ? new Date(r.event_date as string).toISOString() : null,
+    isTitleFight:  Boolean(r.is_title_fight),
+    isMainEvent:   Boolean(r.is_main_event),
     modelVersion:  r.model_version as string,
     firstViewedAt: new Date(r.first_viewed_at as string).toISOString(),
     lastViewedAt:  new Date(r.last_viewed_at as string).toISOString(),

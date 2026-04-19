@@ -36,6 +36,11 @@ export async function POST(
     // could serve a stale prediction from before a fighter swap.
     const body = await req.json();
     const fight: Fight = body.fight;
+    // Optional event context for the /my-predictions history denormalization.
+    // Older clients that don't send this still work — the view row just has
+    // null event_name / event_date and the history page falls back gracefully.
+    const eventName: string | undefined = typeof body.eventName === "string" ? body.eventName : undefined;
+    const eventDate: string | undefined = typeof body.eventDate === "string" ? body.eventDate : undefined;
 
     if (!fight || !fight.fighter1 || !fight.fighter2) {
       return NextResponse.json(
@@ -49,6 +54,7 @@ export async function POST(
     // fresh-generate branch below.)
     const session = await auth();
     const userId = session?.user?.id;
+    const viewCtx = { eventName, eventDate };
 
     // Unified read chain: KV (fast) → Postgres (authoritative) → miss.
     // Postgres hits skip the rate limit AND skip Claude entirely — another
@@ -58,7 +64,7 @@ export async function POST(
     if (stored) {
       // Record view for the user's /my-predictions history. Fire-and-forget;
       // never block the response on a history-write failure.
-      recordPredictionView(fight, userId).catch(() => { /* logged inside */ });
+      recordPredictionView(fight, userId, viewCtx).catch(() => { /* logged inside */ });
       return NextResponse.json(stored);
     }
 
@@ -81,7 +87,7 @@ export async function POST(
     const prediction = await generatePrediction(fight);
     // Record the view on the fresh-generate path too — the user just caused
     // this prediction to exist, so it definitely belongs in their history.
-    recordPredictionView(fight, userId).catch(() => { /* logged inside */ });
+    recordPredictionView(fight, userId, viewCtx).catch(() => { /* logged inside */ });
     return NextResponse.json(prediction);
   } catch (err) {
     console.error("Prediction API error:", err);

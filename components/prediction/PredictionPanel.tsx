@@ -12,6 +12,14 @@ import { formatShortDate } from "@/lib/utils";
 interface PredictionPanelProps {
   fight: Fight;
   /**
+   * Event name/date — forwarded in the POST body so the server can
+   * denormalize them into user_prediction_views for the /my-predictions
+   * history page (avoids an extra ESPN/KV fetch per history row).
+   * Optional: server treats them as nullable.
+   */
+  eventName?: string;
+  eventDate?: string;
+  /**
    * Legacy prop — kept for type-compat with callers that still pass it.
    * NOT used as initial state: every user sees the same "Show Prediction"
    * button regardless of cache status so the page feels consistent. The
@@ -28,7 +36,7 @@ interface PredictionPanelProps {
 // they're the Nth person to see a pre-canned answer.
 const MIN_LOADING_MS = 2000;
 
-export function PredictionPanel({ fight }: PredictionPanelProps) {
+export function PredictionPanel({ fight, eventName, eventDate }: PredictionPanelProps) {
   const [prediction, setPrediction] = useState<PredictionResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -45,7 +53,7 @@ export function PredictionPanel({ fight }: PredictionPanelProps) {
           fetch(`/api/prediction/${fight.id}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ fight }),
+            body: JSON.stringify({ fight, eventName, eventDate }),
           }),
           new Promise((resolve) => setTimeout(resolve, MIN_LOADING_MS)),
         ]);

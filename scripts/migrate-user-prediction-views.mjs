@@ -67,10 +67,31 @@ async function migrate() {
       model_version    VARCHAR(100) NOT NULL,
       first_viewed_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
       last_viewed_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-      view_count       INTEGER      NOT NULL DEFAULT 1
+      view_count       INTEGER      NOT NULL DEFAULT 1,
+      -- Display snapshot columns: denormalized so the /my-predictions page
+      -- doesn't need to re-fetch ESPN / KV for every row. Captured at view time.
+      fighter1_name    VARCHAR(200),
+      fighter2_name    VARCHAR(200),
+      weight_class     VARCHAR(100),
+      event_name       VARCHAR(200),
+      event_date       TIMESTAMPTZ,
+      is_title_fight   BOOLEAN      NOT NULL DEFAULT FALSE,
+      is_main_event    BOOLEAN      NOT NULL DEFAULT FALSE
     )
   `;
   console.log("user_prediction_views table created.");
+
+  // ADD COLUMN IF NOT EXISTS — so re-running against a previously-created
+  // version of this table (without the display snapshot columns) upgrades it
+  // in-place without a destructive migration. Postgres 9.6+.
+  await sql`ALTER TABLE user_prediction_views ADD COLUMN IF NOT EXISTS fighter1_name  VARCHAR(200)`;
+  await sql`ALTER TABLE user_prediction_views ADD COLUMN IF NOT EXISTS fighter2_name  VARCHAR(200)`;
+  await sql`ALTER TABLE user_prediction_views ADD COLUMN IF NOT EXISTS weight_class   VARCHAR(100)`;
+  await sql`ALTER TABLE user_prediction_views ADD COLUMN IF NOT EXISTS event_name     VARCHAR(200)`;
+  await sql`ALTER TABLE user_prediction_views ADD COLUMN IF NOT EXISTS event_date     TIMESTAMPTZ`;
+  await sql`ALTER TABLE user_prediction_views ADD COLUMN IF NOT EXISTS is_title_fight BOOLEAN NOT NULL DEFAULT FALSE`;
+  await sql`ALTER TABLE user_prediction_views ADD COLUMN IF NOT EXISTS is_main_event  BOOLEAN NOT NULL DEFAULT FALSE`;
+  console.log("display snapshot columns ensured (fighter names, weight class, event name/date, flags).");
 
   // One row per user per matchup per model. Incrementing the same user's
   // view on the same fight is an UPSERT against this unique index.

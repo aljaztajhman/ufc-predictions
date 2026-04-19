@@ -2,7 +2,7 @@
 
 import { useSession, signOut } from "next-auth/react";
 import { useState, useRef, useEffect } from "react";
-import { User, LogOut, ChevronDown, Shield, CreditCard } from "lucide-react";
+import { User, LogOut, ChevronDown, Shield, CreditCard, History } from "lucide-react";
 import Link from "next/link";
 
 export function UserMenu() {
@@ -66,6 +66,15 @@ export function UserMenu() {
             </div>
           </div>
           <div className="p-1.5 flex flex-col gap-0.5">
+            {/* My Predictions — visible to every signed-in user */}
+            <Link
+              href="/my-predictions"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm text-white/70 hover:text-white hover:bg-white/6 transition-all"
+            >
+              <History size={14} />
+              My Predictions
+            </Link>
             {/* Renew/subscribe link for non-lifetime, non-admin users */}
             {!isLifetime && !isAdmin && (
               <Link
