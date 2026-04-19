@@ -16,7 +16,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { Fight, Fighter, PredictionResult } from "@/types";
 import { enrichFighterWithUFCStats } from "./ufcstats";
-import { getCachedPrediction, setCachedPrediction } from "./cache";
+import { readStoredPrediction, writeStoredPrediction } from "./predictions";
 import { computeFightSignals } from "./signals";
 import { fetchAllMMAOdds, mapOddsToFight } from "./odds";
 
@@ -158,12 +158,12 @@ Respond ONLY with a JSON object (no markdown code blocks) matching this exact sc
 // ─── Main prediction function ─────────────────────────────────────────────────
 
 export async function generatePrediction(fight: Fight): Promise<PredictionResult> {
-  // 1. Check cache first — v3 (matchup-scoped) first, then v2/v1 legacy fallback.
-  // Passing the fighter IDs means a fighter swap on the same slot (common when
-  // ESPN keeps matchNumber stable through an injury replacement) naturally
-  // misses cache and regenerates against the new matchup.
-  const cached = await getCachedPrediction(fight.id, fight.fighter1.id, fight.fighter2.id);
-  if (cached) return cached;
+  // 1. Look up stored prediction — KV fast path, Postgres fallback.
+  // Postgres is authoritative so a wiped KV does NOT trigger a regeneration
+  // (important for cost + consistency: every user should see the same
+  // prediction for the same matchup).
+  const stored = await readStoredPrediction(fight);
+  if (stored) return stored;
 
   // 2. Enrich fighters + fetch odds in parallel
   const [enrichedF1, enrichedF2, allOdds] = await Promise.all([
@@ -189,9 +189,11 @@ export async function generatePrediction(fight: Fight): Promise<PredictionResult
   const f1Context = buildFighterContext(enrichedF1);
   const f2Context = buildFighterContext(enrichedF2);
 
-  // 6. Call Claude with structured prompt
+  // 6. Call Claude with structured prompt.
+  // Model: claude-opus-4-6 — upgraded from sonnet-4 for stronger matchup
+  // reasoning (more nuanced weighting of form vs. style vs. physical).
   const message = await client.messages.create({
-    model: "claude-sonnet-4-20250514",
+    model: "claude-opus-4-6",
     max_tokens: 1500,
     system: SYSTEM_PROMPT,
     messages: [
@@ -239,9 +241,25 @@ export async function generatePrediction(fight: Fight): Promise<PredictionResult
     generatedAt:  new Date().toISOString(),
   };
 
-  // 8. Cache (writes to v2 key automatically)
-  // Write to v3 (matchup-scoped) key so future fighter swaps naturally invalidate.
-  await setCachedPrediction(fight.id, prediction, fight.fighter1.id, fight.fighter2.id);
+  // 8. Persist: KV (hot cache) + Postgres (authoritative).
+  // The inputs snapshot is written alongside the prediction so we can later
+  // correlate signal patterns with correctness on the accuracy page.
+  await writeStoredPrediction(fight, prediction, {
+    signals: {
+      strikingEdge:    signals.strikingEdge,
+      grapplingEdge:   signals.grapplingEdge,
+      reachEdge:       signals.reachEdge,
+      momentumEdge:    signals.momentumEdge,
+      matchupSummary:  signals.matchupSummary,
+      fighter1FormSummary:    signals.fighter1.formSummary,
+      fighter1StyleSummary:   signals.fighter1.styleSummary,
+      fighter1ContextSummary: signals.fighter1.contextSummary,
+      fighter2FormSummary:    signals.fighter2.formSummary,
+      fighter2StyleSummary:   signals.fighter2.styleSummary,
+      fighter2ContextSummary: signals.fighter2.contextSummary,
+    },
+    marketOdds,
+  });
 
   return prediction;
 }

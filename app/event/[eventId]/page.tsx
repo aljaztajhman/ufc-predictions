@@ -3,13 +3,13 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Calendar, MapPin, Shield } from "lucide-react";
 import { fetchEventWithFights } from "@/lib/espn";
-import { getCachedEventData, setCachedEventData, getCachedPrediction } from "@/lib/cache";
+import { getCachedEventData, setCachedEventData } from "@/lib/cache";
 import { fetchAllMMAOdds, mapOddsToFight } from "@/lib/odds";
 import { FightSection } from "@/components/event/FightCard";
 import { FightCardSkeleton } from "@/components/ui/Skeleton";
 import { Badge, EventTimeBadge } from "@/components/ui/Badge";
 import { formatEventDate, getEventBadge } from "@/lib/utils";
-import type { PredictionResult, EventWithFights, FightOdds } from "@/types";
+import type { EventWithFights, FightOdds } from "@/types";
 import type { Metadata } from "next";
 
 // ISR as backstop — cron pre-warms KV so this rarely fires.
@@ -52,14 +52,20 @@ async function EventContent({ eventId }: { eventId: string }) {
   const prelims = fights.filter((f) => f.section === "prelim").sort((a, b) => a.order - b.order);
   const earlyPrelims = fights.filter((f) => f.section === "early-prelim").sort((a, b) => a.order - b.order);
 
-  // Load cached predictions server-side
+  // Predictions are NOT pre-loaded server-side anymore. Every fight card
+  // renders the same "Show Prediction" button for every user, regardless of
+  // whether a prediction is cached. The user clicks, the client fetches via
+  // /api/prediction/:fightId, and a minimum 2s wait hides the KV/DB/AI
+  // difference so low-traffic cards don't look empty and pre-cached cards
+  // don't look like somebody else already ran them.
+  //
+  // This is intentional UX symmetry: the page feels alive and consistent,
+  // and any prediction the first user generates gets persisted to Postgres
+  // so every subsequent user gets the same answer (free, fast, from cache).
   const allFights = [...mainCard, ...prelims, ...earlyPrelims];
-  const predictionEntries = await Promise.all(
-    allFights.map(async (f) =>
-      [f.id, await getCachedPrediction(f.id, f.fighter1.id, f.fighter2.id)] as [string, PredictionResult | null]
-    )
+  const predictions = Object.fromEntries(
+    allFights.map((f) => [f.id, null] as const),
   );
-  const predictions = Object.fromEntries(predictionEntries);
 
   // Load live odds — matches fighters by name, graceful if API key missing
   const oddsEvents = await fetchAllMMAOdds();

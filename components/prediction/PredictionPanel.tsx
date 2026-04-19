@@ -11,14 +11,28 @@ import { formatShortDate } from "@/lib/utils";
 
 interface PredictionPanelProps {
   fight: Fight;
+  /**
+   * Legacy prop — kept for type-compat with callers that still pass it.
+   * NOT used as initial state: every user sees the same "Show Prediction"
+   * button regardless of cache status so the page feels consistent. The
+   * first click triggers a real fetch; subsequent visitors hit Postgres/KV
+   * behind the scenes via /api/prediction and it still looks the same.
+   */
   cachedPrediction?: PredictionResult | null;
 }
 
-export function PredictionPanel({ fight, cachedPrediction }: PredictionPanelProps) {
-  const [prediction, setPrediction] = useState<PredictionResult | null>(cachedPrediction ?? null);
+// Minimum client-side wait between click and prediction reveal. This hides
+// the difference between a KV hit (~50ms), a Postgres fallback (~150ms), and
+// a fresh Claude generation (~5-15s, though Postgres caches it). From the
+// user's perspective, every fight feels like the AI "is thinking", not like
+// they're the Nth person to see a pre-canned answer.
+const MIN_LOADING_MS = 2000;
+
+export function PredictionPanel({ fight }: PredictionPanelProps) {
+  const [prediction, setPrediction] = useState<PredictionResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  const [requested, setRequested] = useState(!!cachedPrediction);
+  const [requested, setRequested] = useState(false);
 
   const requestPrediction = () => {
     if (isPending || prediction) return;
@@ -27,11 +41,14 @@ export function PredictionPanel({ fight, cachedPrediction }: PredictionPanelProp
 
     startTransition(async () => {
       try {
-        const res = await fetch(`/api/prediction/${fight.id}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ fight }),
-        });
+        const [res] = await Promise.all([
+          fetch(`/api/prediction/${fight.id}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ fight }),
+          }),
+          new Promise((resolve) => setTimeout(resolve, MIN_LOADING_MS)),
+        ]);
 
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
@@ -61,7 +78,7 @@ export function PredictionPanel({ fight, cachedPrediction }: PredictionPanelProp
           )}
         >
           <Sparkles size={15} className="group-hover:scale-110 transition-transform" />
-          Generate AI Prediction
+          Show AI Prediction
           <ChevronRight size={14} className="opacity-60 group-hover:translate-x-0.5 transition-transform" />
         </button>
       </div>

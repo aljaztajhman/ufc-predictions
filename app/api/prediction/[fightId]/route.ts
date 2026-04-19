@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generatePrediction } from "@/lib/claude";
 import { getCachedPrediction } from "@/lib/cache";
+import { readStoredPrediction } from "@/lib/predictions";
 import { auth } from "@/lib/auth";
 import { checkPredictionRateLimit, getClientIp, rateLimitResponse } from "@/lib/ratelimit";
 import type { Fight } from "@/types";
@@ -41,15 +42,13 @@ export async function POST(
       );
     }
 
-    // Matchup-scoped cache check — falls back to v2/v1 for entries written
-    // before v3 if the current fighter pair isn't found.
-    const cached = await getCachedPrediction(
-      params.fightId,
-      fight.fighter1.id,
-      fight.fighter2.id,
-    );
-    if (cached) {
-      return NextResponse.json(cached);
+    // Unified read chain: KV (fast) → Postgres (authoritative) → miss.
+    // Postgres hits skip the rate limit AND skip Claude entirely — another
+    // user has already generated this prediction, so it costs us nothing to
+    // serve it again.
+    const stored = await readStoredPrediction(fight);
+    if (stored) {
+      return NextResponse.json(stored);
     }
 
     if (!process.env.ANTHROPIC_API_KEY) {
